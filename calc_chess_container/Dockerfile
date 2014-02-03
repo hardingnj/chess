@@ -1,21 +1,5 @@
 # This is a Dockerfile
-# chess
-#
 # VERSION       1
-
-# To install: 
-# stockfish
-# perl cpan?
-#use DBI;
-#use Chess::PGN::Parse;
-#use Text::Names qw/cleanName composeName parseName2 samePerson/;
-#use YAML qw/Dump/;
-#use FileHandle;
-#use IPC::Open2;
-#use Term::ANSIColor;
-#use Chess::Rep;
-# mysql
-# git
 
 # use the ubuntu base image provided by dotCloud
 FROM ubuntu
@@ -48,7 +32,7 @@ RUN cpanm Term::ANSIColor
 RUN perl -e 'use YAML; print "YAML ok"'
 
 # install sql
-#RUN apt-get install -y mysql-server
+RUN apt-get install -y mysql-client
 
 # install git
 RUN apt-get install -y git

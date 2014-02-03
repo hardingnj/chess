@@ -28,7 +28,8 @@ my ($Reader, $Engine);
 my $pid = open2($Reader,$Engine,$engine);
 startengine(hashsize => $cfg->{hashsize});
 
-# this is will be a reference to an object. of type game. loop is conditional on this being defined, when no more games this is no longer defined and loop exits.
+# this is will be a reference to an object. of type game. loop is conditional on this being defined
+# when no more games this is no longer defined and loop exits.
 my $game;
 
 # Main loop is here!
@@ -78,7 +79,7 @@ do {
     
         push @moves, $move_uci_format;
 
-    	# code to skip 3 lines if not interested in player, or not eval opening.
+    	# code to skip 3 lines if too early in game
     	if ($cfg->{EvalAfter} >= ($halfmovecounter/2)) {
               push @bestmoves,       'NA';
               push @score_bestmoves, 'NA';
@@ -92,11 +93,11 @@ do {
     	my $bestmove   = choosemove(depth => $cfg->{Depth});
     
     	# on occasion played nove scores higher than best move...
-            push @bestmoves,       $bestmove->{move}; 
-            push @score_bestmoves, $bestmove->{cp};
-            push @score_moves,     $playedmove->{cp};
-            push @mate_moves,      $playedmove->{matein}; 
-            push @mate_bestmoves,  $bestmove->{matein}; 
+        push @bestmoves,       $bestmove->{move}; 
+        push @score_bestmoves, $bestmove->{cp};
+        push @score_moves,     $playedmove->{cp};
+        push @mate_moves,      $playedmove->{matein}; 
+        push @mate_bestmoves,  $bestmove->{matein}; 
     	}
     
     my $end = time;
@@ -223,4 +224,15 @@ sub choosemove {
 			}
 	}
 	die "did not read...";
+}
+
+# --------------------------------------------------------------------------------------------------
+sub get_host_ip {
+# --------------------------------------------------------------------------------------------------
+# Parse the ENV hash to get ip
+	while((my $key, my $value) = each(%ENV)) {
+		print $key . '> ' . $value . $/;
+		if($value =~ m/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/){ return ($1); }
+		}
+	die "Host ip not found in ENV";
 }
