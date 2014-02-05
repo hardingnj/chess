@@ -1,8 +1,7 @@
-DROP DATABASE pgnpilot;
-CREATE DATABASE pgnpilot;
+CREATE DATABASE IF NOT EXISTS pgnpilot;
 use pgnpilot;
 
-CREATE TABLE players (
+CREATE TABLE IF NOT EXISTS players (
     pid int(10) unsigned NOT NULL auto_increment,
     given_name varchar(128) NOT NULL,
     surname varchar(128) NOT NULL,
@@ -10,7 +9,7 @@ CREATE TABLE players (
     PRIMARY KEY (pid)
     );
 
-CREATE TABLE games (
+CREATE TABLE IF NOT EXISTS games (
     id int(10) unsigned NOT NULL auto_increment,
     event varchar(128) NOT NULL default '',
     site varchar(128) NOT NULL default '',
