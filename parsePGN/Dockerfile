@@ -15,7 +15,6 @@ RUN apt-get install -y build-essential
 RUN apt-get install -y make
 RUN apt-get install -y perl
 RUN apt-get install -y cpanminus
-RUN apt-get install -y vim
 
 #RUN emerge perl && perl-cleaner allmodules 
 RUN cpanm -v PerlIO::locale
