@@ -15,6 +15,7 @@ RUN apt-get install -y build-essential
 RUN apt-get install -y make
 RUN apt-get install -y perl
 RUN apt-get install -y cpanminus
+RUN apt-get install -y vim
 
 #RUN emerge perl && perl-cleaner allmodules 
 RUN cpanm -v PerlIO::locale
@@ -29,5 +30,6 @@ RUN apt-get install -y mysql-client
 ADD ./startup.sh /opt/startup.sh
 ADD ./PGN_db.sql /opt/PGN_db.sql
 ADD ./parsePGN.pl /opt/parsePGN.pl
+ADD ./settings.yaml /opt/settings.yaml
 
 CMD ["/bin/bash", "/opt/startup.sh"]

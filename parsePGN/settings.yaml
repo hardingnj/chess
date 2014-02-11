@@ -5,3 +5,7 @@ Depth: 20
 Out: /home/nharding/PGN_results
 EvalAfter: 4
 hashsize: 400
+userid: admin
+passwd: changeme
+dbname: pgnpilot
+driver: mysql

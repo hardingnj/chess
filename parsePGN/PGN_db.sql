@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS players (
     pid int(10) unsigned NOT NULL auto_increment,
     given_name varchar(128) NOT NULL,
     surname varchar(128) NOT NULL,
-    aliases varchar(128) NOT NULL,
     PRIMARY KEY (pid)
     );
 
