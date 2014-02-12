@@ -11,3 +11,7 @@ sudo ./sql_container/run-server.sh
 cd parsePGN
 sudo bash build.sh
 sudo bash run-container.sh
+
+cd ../scorePGN
+sudo bash build.sh
+sudo bash run-client.sh

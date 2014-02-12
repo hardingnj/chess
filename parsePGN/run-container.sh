@@ -7,4 +7,4 @@
 HOSTPATH='/home/nharding/PGN_test/'
 # 
 #docker run -t -rm -link sqlserver:db -name parseContainer -v $PATH:/pgn:ro parsePGN
-docker run -i -t -link sqlserver:db -name parseContainer -v $HOSTPATH:/pgn:ro parsePGN /bin/bash
+docker run --rm -i -t -link sqlserver:db -name parsePGN -v $HOSTPATH:/pgn:ro parsePGN

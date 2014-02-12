@@ -8,6 +8,8 @@ use DBI;
 use Chess::PGN::Parse;
 use Text::Names qw/cleanName composeName parseName2 samePerson/;
 use YAML qw/Dump LoadFile/;
+use Digest::MD5 qw(md5_hex);
+use IO::File;
 
 my $cfg = LoadFile("/opt/settings.yaml");
 
@@ -22,7 +24,24 @@ my $dbh = DBI->connect($dsn, $userid, $password) or die $DBI::errstr;
 
 my %hash = ( "1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
 my $pgnfile = $ARGV[0] // die "PGN must be provided as a command line argument!";
+my $md5 = md5_hex(do { local $/; IO::File->new($pgnfile)->getline });
+
 my $pgn = new Chess::PGN::Parse $pgnfile or die "can't open $pgnfile\n";
+
+my $sql = "select fid from files WHERE checksum = ?";
+my $sth = $dbh->prepare($sql);
+$sth->execute($md5) or die "SQL Error: $DBI::errstr\n";
+my $h = $sth->fetchrow_hashref;
+if(defined $h) {
+  warn "I have previously processed $pgnfile. Exiting";
+  exit 0;
+  }
+$dbh->do(
+  'INSERT INTO files (checksum, filename) VALUES (?, ?)',
+  undef,
+  $md5, $pgnfile
+);
+my $file_id = $dbh->{mysql_insertid};
 
 # Parse PGN
 while($pgn->read_game) {
@@ -46,16 +65,16 @@ while($pgn->read_game) {
   $day   = undef if $day   =~ m/\?\?/;
   
   # look for duplicates
-  my $sql = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND algebraic_moves = ?";
-  my $sth = $dbh->prepare($sql);
+  $sql = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND algebraic_moves = ?";
+  $sth = $dbh->prepare($sql);
   $sth->execute($white, $black, $year, $result, $moves) or die "SQL Error: $DBI::errstr\n";
-  my $h = $sth->fetchrow_hashref;
+  $h = $sth->fetchrow_hashref;
   
   unless (defined $h) {  
     $dbh->do(
-      'INSERT INTO games (white, black, event, site, result, year, month, day, round, algebraic_moves) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO games (white, black, event, site, result, year, month, day, round, algebraic_moves, fileid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       undef,
-      $white, $black, $pgn->event, $pgn->site, $result, $year, $month, $day, $pgn->round, $moves
+      $white, $black, $pgn->event, $pgn->site, $result, $year, $month, $day, $pgn->round, $moves, $file_id
       );
      }
   else { 
