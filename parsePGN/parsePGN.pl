@@ -46,14 +46,14 @@ while($pgn->read_game) {
   $day   = undef if $day   =~ m/\?\?/;
   
   # look for duplicates
-  my $sql = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND moves = ?";
+  my $sql = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND algebraic_moves = ?";
   my $sth = $dbh->prepare($sql);
   $sth->execute($white, $black, $year, $result, $moves) or die "SQL Error: $DBI::errstr\n";
   my $h = $sth->fetchrow_hashref;
   
   unless (defined $h) {  
     $dbh->do(
-      'INSERT INTO games (white, black, event, site, result, year, month, day, round, pgnmoves) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO games (white, black, event, site, result, year, month, day, round, algebraic_moves) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       undef,
       $white, $black, $pgn->event, $pgn->site, $result, $year, $month, $day, $pgn->round, $moves
       );
@@ -74,7 +74,7 @@ sub return_player_id {
   # if computer program, concatenate.
   # has a number. Fritz, Deep blue, junior etc. For now doesn't matter as long as we can recreate initial name.
   if($name =~ m/[0-9]/ || $name =~ m/^Comp\s/i) {
-    warn "I believe $name is a computer.";
+    #warn "I believe $name is a computer.";
     $name =~ s/^Comp\s//;
     $name =~ s/[^a-zA-Z0-9]//g;
     $name .= ", Computer";
@@ -88,14 +88,14 @@ sub return_player_id {
   my $clean = cleanName($name);
   my %playername;
   @playername{qw/given_name initials surname suffix/} = parseName2($clean);
-  my $query = "select given_name, surname, aliases, pid from players WHERE surname = ?";
+  my $query = "select given_name, surname, pid from players WHERE surname = ?";
   my $exec = $dbh->prepare($query);
   $exec->execute($playername{surname}) or die "SQL Error: $DBI::errstr\n";
 
   # loop through records, is given name identical? If yes then return id. 
   # row is a array of length=3 with given name/surname/pid
   my %record;
-  while (@record{qw/given_name surname aliases pid/} = $exec->fetchrow_array) {
+  while (@record{qw/given_name surname pid/} = $exec->fetchrow_array) {
     # is given name identical?
     return $record{pid} if ($record{given_name} eq $playername{given_name});
   }

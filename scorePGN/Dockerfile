@@ -21,6 +21,7 @@ RUN cd /home/stockfish-dd-src/src/ && make build ARCH=x86-32
 ENV PATH $PATH:/home/stockfish-dd-src/src/
 
 # install perl and modules
+RUN apt-get install -y build-essential
 RUN apt-get install -y perl
 RUN apt-get install -y cpanminus
 RUN cpanm YAML::Any
@@ -29,20 +30,12 @@ RUN cpanm Chess::Rep
 RUN cpanm FileHandle
 RUN cpanm IPC::Open2
 RUN cpanm Term::ANSIColor
-RUN perl -e 'use YAML; print "YAML ok"'
 
 # install sql
 RUN apt-get install -y mysql-client
 
-# install git
-RUN apt-get install -y git
-RUN git clone https://github.com/hardingnj/chess.git
+ADD ./startup.sh /opt/startup.sh
+ADD ./scorePGN.pl /opt/scorePGN.pl
+ADD ./settings.yaml /opt/settings.yaml
 
-# Launch memcached when launching the container
-#ENTRYPOINT ["memcached"]
-
-# run memcached as the daemon user
-#USER daemon
-
-# expose memcached port
-#EXPOSE 11211
+CMD ["/bin/bash", "/opt/startup.sh"]

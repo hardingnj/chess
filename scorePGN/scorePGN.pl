@@ -8,22 +8,28 @@ use Term::ANSIColor;
 use YAML qw/LoadFile Dump/;
 use Chess::Rep;
 use DBI;
+my $VERSION = "0.03";
 
-my $VERSION = "0.02";
-my $cfg = LoadFile("./proto.yaml");
+my $cfg = LoadFile("/opt/settings.yaml");
+
+my $userid   = $cfg->{userid};
+my $password = $cfg->{passwd};
+my $database = $cfg->{dbname};
+my $driver   = $cfg->{driver}; 
+my $host_ip  = $ENV{HOSTIP} // die "FATAL: Host IP not found.$/";
+my $dsn = "DBI:$driver:database=$database;hostname=$host_ip";
+
+# establish connection to database. 
+my $dbh = DBI->connect($dsn, $userid, $password) or die $DBI::errstr;
+
 my $engine  = $cfg->{Engine};
 my $players = $cfg->{Players};
-my @dataout;
 
 my $perlversion = sprintf "%vd", $^V;
 my $osstring = $^O;
 
-print "set interface $engine (Perl: $perlversion  OS: $osstring)\n";
-
-# establish connection to database. 
-my $dbh = DBI->connect('dbi:mysql:pgnpilot','root','442mufc') or die "Connection Error: $DBI::errstr\n";
-
 # instantiate engine.
+print "set interface $engine (Perl: $perlversion  OS: $osstring)\n";
 my ($Reader, $Engine);
 my $pid = open2($Reader,$Engine,$engine);
 startengine(hashsize => $cfg->{hashsize});
@@ -34,9 +40,8 @@ my $game;
 
 # Main loop is here!
 do {
-
     # select eligible games
-    my $sql = "select id, pgnmoves from games WHERE processed = 0";
+    my $sql = "select id, algebraic_moves from games WHERE processed = 0";
     my $sth = $dbh->prepare($sql);
     $sth->execute or die "SQL Error: $DBI::errstr\n";
     
@@ -54,21 +59,21 @@ do {
       $game->{id}
       );
     
-    my @pgn_moves = split(/,/, $game->{pgnmoves});
+    my @algebraic_moves = split(/,/, $game->{algebraic_moves});
     
-    my @moves;
-    my @bestmoves;
-    my @score_bestmoves;
-    my @score_moves;
-    my @mate_moves;
-    my @mate_bestmoves;
+    my @coordinate_moves;
+    my @move_scores;
+    my @move_mate_in;
+    my @opt_coordinate_moves;
+    my @opt_move_scores;
+    my @opt_move_mate_in;
     
     my $pos = Chess::Rep->new;
     my $current_state;
     my $halfmovecounter = 0;
-    # loop through moves: 
+    # loop through coordinate_moves: 
     #   do analysis
-    foreach my $move (@pgn_moves) { 
+    foreach my $move (@algebraic_moves) { 
     	# set current state as FEN
     	$current_state = $pos->get_fen;
     	++$halfmovecounter;
@@ -77,15 +82,15 @@ do {
     	my $status = $pos->go_move($move);
     	my $move_uci_format = $status->{from}.$status->{to}; 
     
-        push @moves, $move_uci_format;
+        push @coordinate_moves, $move_uci_format;
 
     	# code to skip 3 lines if too early in game
     	if ($cfg->{EvalAfter} >= ($halfmovecounter/2)) {
-              push @bestmoves,       'NA';
-              push @score_bestmoves, 'NA';
-              push @score_moves,     'NA';
-              push @mate_moves,      'NA';
-              push @mate_bestmoves,  'NA';
+              push @opt_coordinate_moves, 'NA';
+              push @opt_move_scores,      'NA';
+              push @move_scores,          'NA';
+              push @move_mate_in,         'NA';
+              push @opt_move_mate_in,     'NA';
               next;
               }
              
@@ -93,21 +98,21 @@ do {
     	my $bestmove   = choosemove(depth => $cfg->{Depth});
     
     	# on occasion played nove scores higher than best move...
-        push @bestmoves,       $bestmove->{move}; 
-        push @score_bestmoves, $bestmove->{cp};
-        push @score_moves,     $playedmove->{cp};
-        push @mate_moves,      $playedmove->{matein}; 
-        push @mate_bestmoves,  $bestmove->{matein}; 
+        push @opt_coordinate_moves, $bestmove->{move}; 
+        push @opt_move_scores,      $bestmove->{cp};
+        push @move_scores,          $playedmove->{cp};
+        push @move_mate_in,         $playedmove->{matein}; 
+        push @opt_move_mate_in,     $bestmove->{matein}; 
     	}
     
     my $end = time;
     
-    die "something went wrong..." if !@score_moves;
+    die "something went wrong..." if !@move_scores;
 
     $dbh->do(
-      'UPDATE games SET processed = ?, moves = ?, scores = ?, bestmoves = ?, bestscores = ?, playedmatein = ?, bestmatein = ?, time_s = ? WHERE id = ?',
+      'UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?',
       undef,
-      1, join(',', @moves), join(',', @score_moves), join(',', @bestmoves), join(',', @score_bestmoves), join(',', @mate_moves), join(',', @mate_bestmoves), $end - $start, $game->{id}
+      1, join(',', @coordinate_moves), join(',', @move_scores), join(',', @opt_coordinate_moves), join(',', @opt_move_scores), join(',', @move_mate_in), join(',', @opt_move_mate_in), $end - $start, $game->{id}
       );
     
     # end of loop.
@@ -191,7 +196,7 @@ sub choosemove {
 			if (length($bestmove) > 4) {
 				$umwandler = substr($bestmove,4,1);
 				$bestmove = substr($bestmove,0,4);
-				# used if multiple best moves.
+				# used if multiple best coordinate_moves.
 				$bestmove = "$bestmove"."="."$umwandler";
 				}
 			$data{move} = $bestmove;
