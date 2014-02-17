@@ -22,6 +22,7 @@ RUN cpanm IPC::Open2
 RUN cpanm -v Text::Names
 RUN cpanm YAML::Any
 RUN cpanm Chess::PGN::Parse
+RUN cpanm File::Find::Rule
 
 # install sql
 RUN apt-get install -y mysql-client

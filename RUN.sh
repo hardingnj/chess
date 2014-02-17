@@ -12,6 +12,6 @@ cd parsePGN
 sudo bash build.sh
 sudo bash run-container.sh
 
-cd ../scorePGN
-sudo bash build.sh
-sudo bash run-client.sh
+#cd ../scorePGN
+#sudo bash build.sh
+#sudo bash run-client.sh
