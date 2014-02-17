@@ -1,9 +1,8 @@
 ---
 Engine: stockfish
-Players: [Anand, Carlsen]
 Depth: 20
 EvalAfter: 4
-hashsize: 400
+hashsize: 1024
 userid: admin
 passwd: changeme
 dbname: pgnpilot
