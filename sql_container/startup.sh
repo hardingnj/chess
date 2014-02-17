@@ -12,10 +12,4 @@ if [ ! -f /var/lib/mysql/ibdata1 ]; then
 	killall mysqld
 	sleep 10s
 fi
-
-cat /opt/PGN_db.sql
 /usr/bin/mysqld_safe
-
-# initialize database.
-#mysql --user=admin --password=changeme < /opt/PGN_db.sql
-#echo Exit: $?
