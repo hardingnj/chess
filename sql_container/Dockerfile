@@ -1,6 +1,5 @@
-FROM ubuntu
+FROM ubuntu:12.04
 
-#RUN dpkg-divert --local --divert /bin/true --rename /sbin/initctl
 RUN dpkg-divert --local --rename --add /sbin/initctl && ln -s /bin/true /sbin/initctl
 
 RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list
