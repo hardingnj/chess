@@ -1,12 +1,13 @@
-FROM ubuntu:12.04
+FROM debian:wheezy
+#FROM ubuntu:12.04
 
 RUN dpkg-divert --local --rename --add /sbin/initctl
-RUN sleep 3
-RUN ln -s /bin/true /sbin/initctl
+RUN ln -sf /bin/true /sbin/initctl
 
 RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list
 RUN apt-get update
 RUN apt-get upgrade -y
+
 
 RUN apt-get -y install mysql-client mysql-server
 
