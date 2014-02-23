@@ -51,7 +51,7 @@ startengine(hashsize => $cfg{hashsize});
 my $game;
 
 # Main loop is here!
-do {
+LOOP: {
     # select eligible games
     my $sql = "select id, algebraic_moves from games WHERE processed = 0";
     my $sth = $dbh->prepare($sql);
@@ -59,7 +59,7 @@ do {
     
     # choose game
     $game = $sth->fetchrow_hashref;
-    last if !defined $game;
+    last LOOP if !defined $game;
     
     my $start = time;
     print "New game." . join(":", (localtime)) . $/;
@@ -137,7 +137,8 @@ do {
     
     # end of loop.
     say "Evaluating game $game->{id}";
-    } while(defined $game);
+    redo LOOP if defined $game;
+    } 
 say 'Exit ok.';
 exit 0;
 

@@ -1,16 +1,11 @@
 #!/usr/bin/perl -w
 
-# This script will parse a single pgn file and put it in the database.
-# Does a check to see if record exists: if yes, does not enter in db.
-use warnings;
-use strict;
-use DBI;
-use Chess::PGN::Parse;
-use Text::Names qw/cleanName composeName parseName2 samePerson/;
-use YAML qw/Dump LoadFile/;
-use Digest::MD5 qw(md5_hex);
-use IO::File;
-use Getopts::Long;
+# This script will parse a single pgn file and put it in the database.  Does a
+# check to see if record exists: if yes, does not enter in db.
+use warnings; use strict; use DBI; use Chess::PGN::Parse; use Text::Names
+qw/cleanName composeName parseName2 samePerson/; use YAML qw/Dump LoadFile/;
+use Digest::MD5 qw(md5_hex); use IO::File;
+use Getopt::Long;
 use File::Find::Rule;
 
 my %cfg = %{LoadFile("/opt/settings.yaml")};
