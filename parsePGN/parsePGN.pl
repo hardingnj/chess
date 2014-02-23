@@ -135,9 +135,9 @@ sub return_player_id {
   }
 
 sub choosePGN {
-  my @PGNfiles = File::Find::Rule->file()->name('*.PGN', '*.pgn')->in(shift);
-  print "in choose PGN".$/;
-  print "Found $#PGNfiles.".$/;
+  my $searchdir = shift;
+  my @PGNfiles = File::Find::Rule->file()->name('*.PGN', '*.pgn')->in($searchdir);
+  print "in choose PGN. Found @PGNfiles in $searchdir".$/;
   
   my $newfileflag = 0;
   my ($chosen_file, $file_id);
