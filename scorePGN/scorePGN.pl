@@ -8,23 +8,35 @@ use Term::ANSIColor;
 use YAML qw/LoadFile Dump/;
 use Chess::Rep;
 use DBI;
+use Getopt::Long;
 my $VERSION = "0.04";
 
-my $cfg = LoadFile("/opt/settings.yaml");
+my %cfg = %{LoadFile("/opt/settings.yaml")};
 
-my $userid   = $cfg->{userid};
-my $password = $cfg->{passwd};
-my $database = $cfg->{dbname};
-my $driver   = $cfg->{driver}; 
+GetOptions(
+  \%cfg, 
+  'userid:s',
+  'passwd:s',
+  'dbname:s',
+  'driver:s',
+  'Engine:s',
+  'Depth:i',
+  'EvalAfter:i',
+  'hashsize:i'
+  ) or die "Bad options passed";	
+print Dump(\%cfg);
+
+my $userid   = $cfg{userid};
+my $password = $cfg{passwd};
+my $database = $cfg{dbname};
+my $driver   = $cfg{driver}; 
 my $host_ip  = $ENV{HOSTIP} // die "FATAL: Host IP not found.$/";
 my $dsn = "DBI:$driver:database=$database;hostname=$host_ip";
 
 # establish connection to database. 
 my $dbh = DBI->connect($dsn, $userid, $password) or die $DBI::errstr;
 
-my $engine  = $cfg->{Engine};
-my $players = $cfg->{Players};
-
+my $engine  = $cfg{Engine};
 my $perlversion = sprintf "%vd", $^V;
 my $osstring = $^O;
 
@@ -32,7 +44,7 @@ my $osstring = $^O;
 print "set interface $engine (Perl: $perlversion  OS: $osstring)\n";
 my ($Reader, $Engine);
 my $pid = open2($Reader,$Engine,$engine);
-startengine(hashsize => $cfg->{hashsize});
+startengine(hashsize => $cfg{hashsize});
 
 # this is will be a reference to an object. of type game. loop is conditional on this being defined
 # when no more games this is no longer defined and loop exits.
@@ -86,7 +98,7 @@ do {
         push @coordinate_moves, $move_as_coordinates;
 
     	# code to skip 3 lines if too early in game
-    	if ($cfg->{EvalAfter} >= ($halfmovecounter/2)) {
+    	if ($cfg{EvalAfter} >= ($halfmovecounter/2)) {
               push @opt_coordinate_moves, 'NA';
               push @opt_algebraic_moves,  'NA';
               push @opt_move_scores,      'NA';
@@ -96,8 +108,8 @@ do {
               next;
               }
              
-    	my $playedmove = choosemove(fen => $current_fen, searchmoves => [$move_as_coordinates], depth => $cfg->{Depth});
-    	my $bestmove   = choosemove(depth => $cfg->{Depth});
+    	my $playedmove = choosemove(fen => $current_fen, searchmoves => [$move_as_coordinates], depth => $cfg{Depth});
+    	my $bestmove   = choosemove(depth => $cfg{Depth});
     
 		# dummy pos
 		my $dummy_position = Chess::Rep->new($current_fen);

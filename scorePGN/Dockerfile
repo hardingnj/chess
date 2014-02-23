@@ -38,4 +38,4 @@ ADD ./startup.sh /opt/startup.sh
 ADD ./scorePGN.pl /opt/scorePGN.pl
 ADD ./settings.yaml /opt/settings.yaml
 
-CMD ["/bin/bash", "/opt/startup.sh"]
+ENTRYPOINT ["/bin/bash", "/opt/startup.sh"]
