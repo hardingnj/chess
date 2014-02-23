@@ -10,6 +10,7 @@ use Text::Names qw/cleanName composeName parseName2 samePerson/;
 use YAML qw/Dump LoadFile/;
 use Digest::MD5 qw(md5_hex);
 use IO::File;
+use Getopts::Long;
 use File::Find::Rule;
 
 my %cfg = %{LoadFile("/opt/settings.yaml")};
