@@ -4,7 +4,8 @@ FROM debian:wheezy
 RUN dpkg-divert --local --rename --add /sbin/initctl
 RUN ln -sf /bin/true /sbin/initctl
 
-RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list
+RUN echo "deb http://http.debian.net/debian wheezy main" > /etc/apt/sources.list
+RUN echo "deb-src http://http.debian.net/debian wheezy main" >> /etc/apt/sources.list
 RUN apt-get update
 RUN apt-get upgrade -y
 
