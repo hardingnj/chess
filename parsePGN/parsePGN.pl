@@ -12,12 +12,22 @@ use Digest::MD5 qw(md5_hex);
 use IO::File;
 use File::Find::Rule;
 
-my $cfg = LoadFile("/opt/settings.yaml");
+my %cfg = %{LoadFile("/opt/settings.yaml")};
 
-my $userid   = $cfg->{userid};
-my $password = $cfg->{passwd};
-my $database = $cfg->{dbname};
-my $driver   = $cfg->{driver}; 
+GetOptions(
+  \%cfg, 
+  'userid:s',
+  'passwd:s',
+  'dbname:s',
+  'driver:s',
+  'sleeptime:i',
+  'pgndir:s'
+  ) or die "Bad options passed";	
+
+my $userid   = $cfg{userid};
+my $password = $cfg{passwd};
+my $database = $cfg{dbname};
+my $driver   = $cfg{driver}; 
 my $host_ip  = $ENV{HOSTIP} // die "FATAL: Host IP not found.$/";
 my $dsn = "DBI:$driver:database=$database;hostname=$host_ip";
 
@@ -35,14 +45,13 @@ my %hash = ( "1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
   # find all the subdirectories of a given directory
 
   # find all the .pm files in @INC
-my $directory = $ARGV[0] // die "PGN directory must be provided as a command line argument!";
 
 # ie infinite loop!
 while(1) {
   # this function returns the pgn file, and its fid.
-  my $pgnfile = choosePGN($directory);
+  my $pgnfile = choosePGN($cfg{pgndir});
   print Dump($pgnfile);
-  unless (defined $pgnfile) { sleep($cfg->{sleeptime}) and next; }
+  unless (defined $pgnfile) { sleep($cfg{sleeptime}) and next; }
 
   my $pgn = new Chess::PGN::Parse $pgnfile->{filepath} or die "can't open $pgnfile->{filepath}\n";
 
@@ -85,7 +94,7 @@ while(1) {
       print "appears to be duplicate of record $h->{id}. Skipping...".$/; 
       }
   }
-  sleep($cfg->{sleeptime});
+  sleep($cfg{sleeptime});
 }
 
 exit 127;

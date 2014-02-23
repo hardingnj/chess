@@ -9,4 +9,4 @@ export HOSTIP=$(env | perl -ne 'if($_ =~ m/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/
 mysql --user=admin --password=changeme -h $HOSTIP < /opt/PGN_db.sql
 
 # now kick off the perl script
-perl /opt/parsePGN.pl /pgn/
+perl /opt/parsePGN.pl $@

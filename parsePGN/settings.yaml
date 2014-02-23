@@ -1,10 +1,7 @@
 ---
-Engine: /home/nharding/stockfish/stockfish-3-linux/src/stockfish
-Depth: 20
-Out: /home/nharding/PGN_results
-EvalAfter: 4
 userid: admin
 passwd: changeme
 dbname: pgnpilot
 driver: mysql
 sleeptime: 300
+pgndir: /pgn/

@@ -16,7 +16,6 @@ RUN apt-get install -y make
 RUN apt-get install -y perl
 RUN apt-get install -y cpanminus
 
-#RUN emerge perl && perl-cleaner allmodules 
 RUN cpanm -v PerlIO::locale
 RUN cpanm IPC::Open2
 RUN cpanm -v Text::Names
@@ -32,4 +31,4 @@ ADD ./PGN_db.sql /opt/PGN_db.sql
 ADD ./parsePGN.pl /opt/parsePGN.pl
 ADD ./settings.yaml /opt/settings.yaml
 
-CMD ["/bin/bash", "/opt/startup.sh"]
+ENTRYPOINT ["/bin/bash", "/opt/startup.sh"]
