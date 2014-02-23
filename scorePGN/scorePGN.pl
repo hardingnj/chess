@@ -62,7 +62,8 @@ do {
     last if !defined $game;
     
     my $start = time;
-    
+    print "New game." . join(":", (localtime)) . $/;
+
     # set processed to 2. Signifies in process. 
     $dbh->do(
       'UPDATE games SET processed = ? WHERE id = ?',
