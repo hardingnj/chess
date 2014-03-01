@@ -25,14 +25,14 @@ GetOptions(
   'pgndir:s'
   ) or die "Bad options passed";	
 
-my $userid   = $cfg{userid};
-my $password = $cfg{passwd};
-my $database = $cfg{dbname};
-my $driver   = $cfg{driver}; 
-my $host_ip  = $ENV{HOSTIP} // die "FATAL: Host IP not found.$/";
-my $dsn = "DBI:$driver:database=$database;hostname=$host_ip";
+my $database = $cfg{dbpath};
+my $driver   = $cfg{driver} // 'SQLite'; 
 
-my $dbh = DBI->connect($dsn, $userid, $password) or die $DBI::errstr;
+my $dbh = DBI->connect(
+	"dbi:$driver:dbname=$database",
+	"",
+	""
+	) or die $DBI::errstr;
 my %hash = ( "1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
 
 # LOGIC 
@@ -71,7 +71,7 @@ while(1) {
     my $white = return_player_id($pgn->white);
     my $black = return_player_id($pgn->black);
     
-    unless(defined $white and defined $black) { warn "Names not successfully parsed, skipping this record"; next; }
+    unless(defined $white and defined $black) { warn "Names not successfully parsed, skipping this record. Should dump a decent log message here."; }
   
     $year  = undef if $year  =~ m/\?\?/;
     $month = undef if $month =~ m/\?\?/;
@@ -140,8 +140,9 @@ sub return_player_id {
     undef,
     $playername{given_name}, $playername{surname}
     );
-  print "id: $dbh->{mysql_insertid}".$/;
-  return $dbh->{mysql_insertid};
+  my $id = $dbh->last_insert_id("", "", "players", "");
+  print "id: $id".$/;
+  return $id;
   }
 
 sub choosePGN {
@@ -168,7 +169,7 @@ sub choosePGN {
         undef,
         $md5, $chosen_file
       );
-    $file_id = $dbh->{mysql_insertid};  
+	$file_id = $dbh->last_insert_id("", "", "files", "");
     last;
     }
     else {

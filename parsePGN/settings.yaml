@@ -1,7 +1,5 @@
 ---
-userid: admin
-passwd: changeme
-dbname: pgnpilot
-driver: mysql
+dbpath: /data/chessAnalysis.db
+driver: SQLite
 sleeptime: 300
 pgndir: /pgn/

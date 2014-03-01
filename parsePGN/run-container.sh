@@ -4,4 +4,4 @@
 # PATH IS THE LOCATION ON THE HOST OF THE PGN FILES
 #PATH='/glusterfs/users/nharding/pgn_data'
 HOSTPATH='/home/nharding/PGN_test/'
-docker run -d -t -link sqlserver:db -name parsePGN -v $HOSTPATH:/pgn:ro parsePGN
+docker run -i -t -name parsepgn -v $HOSTPATH:/pgn:ro -v /home/nharding/sqldata/:/data parsepgn

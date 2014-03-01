@@ -1,3 +1,3 @@
 #!/bin/sh
-docker build -t parsePGN .
-echo Done docker image tagged parsePGN
+docker build -t parsepgn .
+echo Done docker image tagged parsepgn

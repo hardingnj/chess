@@ -22,13 +22,13 @@ RUN cpanm -v Text::Names
 RUN cpanm YAML::Any
 RUN cpanm Chess::PGN::Parse
 RUN cpanm File::Find::Rule
+RUN cpanm DBD::SQLite
+RUN cpanm DBI
 
 # install sql
-RUN apt-get install -y mysql-client
+RUN sudo apt-get install -y sqlite3
 
-ADD ./startup.sh /opt/startup.sh
-ADD ./PGN_db.sql /opt/PGN_db.sql
 ADD ./parsePGN.pl /opt/parsePGN.pl
 ADD ./settings.yaml /opt/settings.yaml
 
-ENTRYPOINT ["/bin/bash", "/opt/startup.sh"]
+ENTRYPOINT ["/usr/bin/perl", "/opt/parsePGN.pl"]
