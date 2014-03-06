@@ -9,7 +9,8 @@ use YAML qw/LoadFile Dump/;
 use Chess::Rep;
 use DBI;
 use Getopt::Long;
-my $VERSION = "0.04";
+
+my $VERSION = "0.10";
 
 my %cfg = %{LoadFile("/opt/settings.yaml")};
 
@@ -22,19 +23,23 @@ GetOptions(
   'Engine:s',
   'Depth:i',
   'EvalAfter:i',
-  'hashsize:i'
+  'hashsize:i',
+  'timeout:i',
+  'verbose'
   ) or die "Bad options passed";	
+
+my $database = $cfg{dbpath};
+my $driver   = $cfg{driver} // 'SQLite'; 
+my $timeout  = $cfg{timeout} // 0;
 print Dump(\%cfg);
 
-my $userid   = $cfg{userid};
-my $password = $cfg{passwd};
-my $database = $cfg{dbname};
-my $driver   = $cfg{driver}; 
-my $host_ip  = $ENV{HOSTIP} // die "FATAL: Host IP not found.$/";
-my $dsn = "DBI:$driver:database=$database;hostname=$host_ip";
-
-# establish connection to database. 
-my $dbh = DBI->connect($dsn, $userid, $password) or die $DBI::errstr;
+my $dbh = DBI->connect(
+	"dbi:$driver:dbname=$database",
+	"",
+	""#,
+    #{ sqlite_use_immediate_transaction => 1, }
+	) or die $DBI::errstr;
+$dbh->sqlite_busy_timeout($timeout);
 
 my $engine  = $cfg{Engine};
 my $perlversion = sprintf "%vd", $^V;
@@ -50,19 +55,20 @@ startengine(hashsize => $cfg{hashsize});
 # when no more games this is no longer defined and loop exits.
 my $game;
 
+# select eligible games
+my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
+my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
+
 # Main loop is here!
 LOOP: {
-    # select eligible games
-    my $sql = "select id, algebraic_moves from games WHERE processed = 0";
-    my $sth = $dbh->prepare($sql);
-    $sth->execute or die "SQL Error: $DBI::errstr\n";
+    $selectgames->execute or die "SQL Error: $DBI::errstr\n";
     
     # choose game
-    $game = $sth->fetchrow_hashref;
+    $game = $selectgames->fetchrow_hashref;
     last LOOP if !defined $game;
     
     my $start = time;
-    print "New game." . join(":", (localtime)) . $/;
+    print "New game. " . join(":", (localtime)) . $/;
 
     # set processed to 2. Signifies in process. 
     $dbh->do(
@@ -70,7 +76,7 @@ LOOP: {
       undef,
       2,
       $game->{id}
-      );
+      ) or die $DBI::errstr;
     
     my @algebraic_moves = split(/,/, $game->{algebraic_moves});
     my @coordinate_moves;
@@ -109,8 +115,8 @@ LOOP: {
               next;
               }
              
-    	my $playedmove = choosemove(fen => $current_fen, searchmoves => [$move_as_coordinates], depth => $cfg{Depth});
-    	my $bestmove   = choosemove(depth => $cfg{Depth});
+    	my $playedmove = choosemove(fen => $current_fen, searchmoves => [$move_as_coordinates], depth => $cfg{Depth}, verbose => $cfg{verbose});
+    	my $bestmove   = choosemove(depth => $cfg{Depth}, verbose => $cfg{verbose});
     
 		# dummy pos
 		my $dummy_position = Chess::Rep->new($current_fen);
@@ -133,10 +139,10 @@ LOOP: {
       'UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?',
       undef,
       1, join(',', @coordinate_moves), join(',', @move_scores), join(',', @opt_algebraic_moves), join(',', @opt_coordinate_moves), join(',', @opt_move_scores), join(',', @move_mate_in), join(',', @opt_move_mate_in), $end - $start, $game->{id}
-      );
+      ) or die $DBI::errstr;
     
     # end of loop.
-    say "Evaluating game $game->{id}";
+    say "Evaluated game $game->{id}";
     redo LOOP if defined $game;
     } 
 say 'Exit ok.';

@@ -1,3 +1,4 @@
 #!/bin/sh
 # -t for tag? -i for interactive 
-docker run -d -t -link sqlserver:db -name scorePGN scorePGN
+HOSTPATH='/home/nharding/'
+docker run -d -t -name scorepgn -v ${HOSTPATH}/chessDB:/data scorepgn $@

@@ -3,7 +3,5 @@ Engine: stockfish
 Depth: 20
 EvalAfter: 4
 hashsize: 1024
-userid: admin
-passwd: changeme
-dbname: pgnpilot
-driver: mysql
+dbpath: /data/chessAnalysis.db
+driver: SQLite

@@ -30,12 +30,12 @@ RUN cpanm Chess::Rep
 RUN cpanm FileHandle
 RUN cpanm IPC::Open2
 RUN cpanm Term::ANSIColor
+RUN cpanm DBD::SQLite
 
 # install sql
-RUN apt-get install -y mysql-client
+RUN apt-get install -y sqlite3
 
-ADD ./startup.sh /opt/startup.sh
 ADD ./scorePGN.pl /opt/scorePGN.pl
 ADD ./settings.yaml /opt/settings.yaml
 
-ENTRYPOINT ["/bin/bash", "/opt/startup.sh"]
+ENTRYPOINT ["/usr/bin/perl", "/opt/scorePGN.pl"]
