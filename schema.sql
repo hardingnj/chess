@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS players (
 
 CREATE TABLE IF NOT EXISTS files (
     fid INTEGER PRIMARY KEY,
+    completed INTEGER NOT NULL default 0,
     checksum TEXT NOT NULL,
     filename TEXT NOT NULL
     );
