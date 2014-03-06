@@ -23,10 +23,9 @@ RUN cpanm YAML::Any
 RUN cpanm Chess::PGN::Parse
 RUN cpanm File::Find::Rule
 RUN cpanm DBD::SQLite
-RUN cpanm DBI
 
 # install sql
-RUN sudo apt-get install -y sqlite3
+RUN apt-get install -y sqlite3
 
 ADD ./parsePGN.pl /opt/parsePGN.pl
 ADD ./settings.yaml /opt/settings.yaml
