@@ -31,15 +31,6 @@ GetOptions(
 my $database = $cfg{dbpath};
 my $driver   = $cfg{driver} // 'SQLite'; 
 my $timeout  = $cfg{timeout} // 0;
-print Dump(\%cfg);
-
-my $dbh = DBI->connect(
-	"dbi:$driver:dbname=$database",
-	"",
-	""#,
-    #{ sqlite_use_immediate_transaction => 1, }
-	) or die $DBI::errstr;
-$dbh->sqlite_busy_timeout($timeout);
 
 my $engine  = $cfg{Engine};
 my $perlversion = sprintf "%vd", $^V;
@@ -54,48 +45,50 @@ startengine(hashsize => $cfg{hashsize});
 # this is will be a reference to an object. of type game. loop is conditional on this being defined
 # when no more games this is no longer defined and loop exits.
 my $game;
+my $dbh;
 
-# select eligible games
-my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
-my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
-
-# Main loop is here!
 LOOP: {
-    $selectgames->execute or die "SQL Error: $DBI::errstr\n";
+  # Define and declare database connection
+  $dbh = DBI->connect( "dbi:$driver:dbname=$database", "", "") or die $DBI::errstr;
+  $dbh->sqlite_busy_timeout($timeout);
+  my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
+  my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
+  $selectgames->execute or die "SQL Error: $DBI::errstr\n";
     
-    # choose game
-    $game = $selectgames->fetchrow_hashref;
-    last LOOP if !defined $game;
+  # choose game
+  $game = $selectgames->fetchrow_hashref;
+  if (!defined $game) { sleep 60; $selectgames->finish; $dbh->disconnect; next LOOP; }
     
-    my $start = time;
-    print "New game. " . join(":", (localtime)) . $/;
+  my $start = time;
 
-    # set processed to 2. Signifies in process. 
-    $dbh->do(
-      'UPDATE games SET processed = ? WHERE id = ?',
-      undef,
-      2,
-      $game->{id}
-      ) or die $DBI::errstr;
-    
-    my @algebraic_moves = split(/,/, $game->{algebraic_moves});
-    my @coordinate_moves;
-    my @move_scores;
-    my @move_mate_in;
+  # set processed to 2. Signifies in process. 
+  $dbh->do(
+    'UPDATE games SET processed = ? WHERE id = ?',
+    undef,
+    2,
+    $game->{id}
+    ) or die $DBI::errstr;
+  $selectgames->finish;
+  $dbh->disconnect;  
 
-    my @opt_algebraic_moves;
-    my @opt_coordinate_moves;
-    my @opt_move_scores;
-    my @opt_move_mate_in;
+  my @algebraic_moves = split(/,/, $game->{algebraic_moves});
+  my @coordinate_moves;
+  my @move_scores;
+  my @move_mate_in;
+
+  my @opt_algebraic_moves;
+  my @opt_coordinate_moves;
+  my @opt_move_scores;
+  my @opt_move_mate_in;
     
-    my $pos = Chess::Rep->new;
-    my $current_fen;
-    my $halfmovecounter = 0;
-    # loop through coordinate_moves: 
-    #   do analysis
-    foreach my $move (@algebraic_moves) { 
-    	# set current state as FEN
-    	$current_fen = $pos->get_fen;
+  my $pos = Chess::Rep->new;
+  my $current_fen;
+  my $halfmovecounter = 0;
+  # loop through coordinate_moves: 
+  #   do analysis
+  foreach my $move (@algebraic_moves) { 
+  # set current state as FEN
+  $current_fen = $pos->get_fen;
     	++$halfmovecounter;
     	
     	# update board with current move & capture move info
@@ -135,15 +128,18 @@ LOOP: {
     
     die "something went wrong..." if !@move_scores;
 
+    $dbh = DBI->connect( "dbi:$driver:dbname=$database", "", "") or die $DBI::errstr;
+    $dbh->sqlite_busy_timeout($timeout);
     $dbh->do(
       'UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?',
       undef,
       1, join(',', @coordinate_moves), join(',', @move_scores), join(',', @opt_algebraic_moves), join(',', @opt_coordinate_moves), join(',', @opt_move_scores), join(',', @move_mate_in), join(',', @opt_move_mate_in), $end - $start, $game->{id}
       ) or die $DBI::errstr;
+    $dbh->disconnect;
     
     # end of loop.
     say "Evaluated game $game->{id}";
-    redo LOOP if defined $game;
+    redo LOOP;
     } 
 say 'Exit ok.';
 exit 0;
