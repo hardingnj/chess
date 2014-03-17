@@ -28,7 +28,7 @@ GetOptions(
 
 our $database = $cfg{dbpath};
 our $driver   = $cfg{driver} // 'SQLite'; 
-our $timeout  = $cfg{timeout} // 0;
+our $timeout  = $cfg{timeout} // 3000;
 print Dump(\%cfg);
 
 my %hash = ( "1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);

@@ -1,6 +1,7 @@
 ---
 Engine: stockfish
 Depth: 20
+sleeptime: 600
 EvalAfter: 4
 hashsize: 1024
 dbpath: /data/chessAnalysis.db

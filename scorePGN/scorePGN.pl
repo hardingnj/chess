@@ -25,12 +25,13 @@ GetOptions(
   'EvalAfter:i',
   'hashsize:i',
   'timeout:i',
+  'sleeptime:i',
   'verbose'
   ) or die "Bad options passed";	
 
 my $database = $cfg{dbpath};
 my $driver   = $cfg{driver} // 'SQLite'; 
-my $timeout  = $cfg{timeout} // 0;
+my $timeout  = $cfg{timeout} // 3000;
 
 my $engine  = $cfg{Engine};
 my $perlversion = sprintf "%vd", $^V;
@@ -47,7 +48,7 @@ startengine(hashsize => $cfg{hashsize});
 my $game;
 my $dbh;
 
-LOOP: {
+while(1) {
   # Define and declare database connection
   $dbh = DBI->connect( "dbi:$driver:dbname=$database", "", "") or die $DBI::errstr;
   $dbh->sqlite_busy_timeout($timeout);
@@ -57,10 +58,11 @@ LOOP: {
     
   # choose game
   $game = $selectgames->fetchrow_hashref;
-  if (!defined $game) { sleep 60; $selectgames->finish; $dbh->disconnect; next LOOP; }
+  if (!defined $game) { warn "No games found to be processed..."; sleep $cfg{sleeptime}; $selectgames->finish; $dbh->disconnect; next; }
     
   my $start = time;
 
+  say "About to process game $game->{id}";
   # set processed to 2. Signifies in process. 
   $dbh->do(
     'UPDATE games SET processed = ? WHERE id = ?',
@@ -71,6 +73,7 @@ LOOP: {
   $selectgames->finish;
   $dbh->disconnect;  
 
+  say "Evaluating game $game->{id}";
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
   my @coordinate_moves;
   my @move_scores;
@@ -109,7 +112,7 @@ LOOP: {
               }
              
     	my $playedmove = choosemove(fen => $current_fen, searchmoves => [$move_as_coordinates], depth => $cfg{Depth}, verbose => $cfg{verbose});
-    	my $bestmove   = choosemove(depth => $cfg{Depth}, verbose => $cfg{verbose});
+    	my $bestmove   = choosemove(fen => $current_fen, depth => $cfg{Depth}, verbose => $cfg{verbose});
     
 		# dummy pos
 		my $dummy_position = Chess::Rep->new($current_fen);
@@ -128,6 +131,7 @@ LOOP: {
     
     die "something went wrong..." if !@move_scores;
 
+    say "Evaluated game $game->{id}. About to add to databse.";
     $dbh = DBI->connect( "dbi:$driver:dbname=$database", "", "") or die $DBI::errstr;
     $dbh->sqlite_busy_timeout($timeout);
     $dbh->do(
@@ -138,11 +142,8 @@ LOOP: {
     $dbh->disconnect;
     
     # end of loop.
-    say "Evaluated game $game->{id}";
-    redo LOOP;
     } 
-say 'Exit ok.';
-exit 0;
+die 'Exiting. Should not reach here until killed.';
 
 #-----------------------------------------------	
 sub startengine {
@@ -153,6 +154,7 @@ sub startengine {
 		@_
 		);
 	my $count = 0;
+	my $success = 0;
 	while (<$Reader>) {
 		
 		my $line = $_;
@@ -173,9 +175,11 @@ sub startengine {
 			print $Engine "setoption name Hash value $args{hashsize}\n";
 			print $Engine "setoption name UCI_AnalyseMode value true\n";
 			print $Engine "setoption name OwnBook value true\n";
+			++$success;
 			last;
-		}
+		} 
 	}
+    die "Engine failed to initialize. $!" unless $success;
 }
 
 #-----------------------------------------------
@@ -201,8 +205,8 @@ sub choosemove {
 	if(@searchmoves) { $command .= ' searchmoves '; $command .= join(' ', @searchmoves); } 
 	print "Debug: $command".$/ if $args{verbose};
 
-	print $Engine "position fen $args{fen}\n" if (defined $args{fen} and $args{verbose});
-	print $Engine $command.$/ if $args{verbose};
+	print $Engine "position fen $args{fen}\n"; 
+	print $Engine $command.$/;
 	while (<$Reader>) {
 
 		my $line = $_;
@@ -238,7 +242,7 @@ sub choosemove {
 				if($val =~ m/^score$/){
 					my $scoretype = shift @pvdata;
 					if($scoretype =~ m/cp/){ $data{cp} = shift @pvdata; $data{matein} = 'NA'; } 
-					else { $data{mate} = shift @pvdata; $data{cp} = 'NA'; }
+					else { $data{matein} = shift @pvdata; $data{cp} = 'NA'; }
 					}
 				if($val =~ m/^multipv$/){
 					# ignore the next two args
@@ -248,9 +252,8 @@ sub choosemove {
 					$#pvdata = -1;
 					}
 				}
-
 			return \%data;
-			}
+		}
 	}
 	die "did not read...";
 }
