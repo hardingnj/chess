@@ -4,5 +4,3 @@ sudo apt-get update
 sudo apt-get install -y --force-yes lxc-docker
 
 sudo docker pull hardingnj/scorepgn
-HOSTLOC=/glusterfs/users/nharding/
-sudo docker run -d -t -name scorepgn -v ${HOSTLOC}/chessDB:/data hardingnj/scorepgn --hashsize 1600
