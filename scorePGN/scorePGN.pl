@@ -10,7 +10,7 @@ use Chess::Rep;
 use DBI;
 use Getopt::Long;
 
-my $VERSION = "0.10";
+my $VERSION = "0.1.1";
 
 my %cfg = %{LoadFile("/opt/settings.yaml")};
 
@@ -38,7 +38,7 @@ my $perlversion = sprintf "%vd", $^V;
 my $osstring = $^O;
 
 # instantiate engine.
-print "set interface $engine (Perl: $perlversion  OS: $osstring)\n";
+print "set interface $engine (Perl: $perlversion, OS: $osstring, VERSION: $VERSION)\n";
 my ($Reader, $Engine);
 my $pid = open2($Reader,$Engine,$engine);
 startengine(hashsize => $cfg{hashsize});
@@ -48,17 +48,24 @@ startengine(hashsize => $cfg{hashsize});
 my $game;
 my $dbh;
 
+# Define and declare database connection
+$dbh = DBI->connect(
+	"dbi:$driver:dbname=$database",
+	"",
+	"",
+    { sqlite_use_immediate_transaction => 1, }
+	) or die $DBI::errstr;
+$dbh->sqlite_busy_timeout($timeout);
+my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
+
 while(1) {
-  # Define and declare database connection
-  $dbh = DBI->connect( "dbi:$driver:dbname=$database", "", "") or die $DBI::errstr;
-  $dbh->sqlite_busy_timeout($timeout);
-  my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
   my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
   $selectgames->execute or die "SQL Error: $DBI::errstr\n";
     
   # choose game
   $game = $selectgames->fetchrow_hashref;
-  if (!defined $game) { warn "No games found to be processed..."; sleep $cfg{sleeptime}; $selectgames->finish; $dbh->disconnect; next; }
+  $selectgames->finish;
+  if (!defined $game) { warn "No games found to be processed..."; sleep $cfg{sleeptime}; next; }
     
   my $start = time;
 
@@ -70,8 +77,6 @@ while(1) {
     2,
     $game->{id}
     ) or die $DBI::errstr;
-  $selectgames->finish;
-  $dbh->disconnect;  
 
   say "Evaluating game $game->{id}";
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
@@ -132,14 +137,11 @@ while(1) {
     die "something went wrong..." if !@move_scores;
 
     say "Evaluated game $game->{id}. About to add to databse.";
-    $dbh = DBI->connect( "dbi:$driver:dbname=$database", "", "") or die $DBI::errstr;
-    $dbh->sqlite_busy_timeout($timeout);
     $dbh->do(
-      'UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?',
+      "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
       undef,
       1, join(',', @coordinate_moves), join(',', @move_scores), join(',', @opt_algebraic_moves), join(',', @opt_coordinate_moves), join(',', @opt_move_scores), join(',', @move_mate_in), join(',', @opt_move_mate_in), $end - $start, $game->{id}
       ) or die $DBI::errstr;
-    $dbh->disconnect;
     
     # end of loop.
     } 
