@@ -14,6 +14,9 @@ my $VERSION = "0.1.1";
 
 my %cfg = %{LoadFile("/opt/settings.yaml")};
 
+# Set autoflush for debugging.
+$| = 1;
+
 GetOptions(
   \%cfg, 
   'userid:s',
@@ -88,7 +91,7 @@ while(1) {
   my @opt_coordinate_moves;
   my @opt_move_scores;
   my @opt_move_mate_in;
-    
+
   my $pos = Chess::Rep->new;
   my $current_fen;
   my $halfmovecounter = 0;
@@ -98,11 +101,11 @@ while(1) {
   # set current state as FEN
   $current_fen = $pos->get_fen;
     	++$halfmovecounter;
-    	
+
     	# update board with current move & capture move info
     	my $status = $pos->go_move($move);
     	my $move_as_coordinates = $status->{from}.$status->{to}; 
-    
+
         push @coordinate_moves, $move_as_coordinates;
 
     	# code to skip 3 lines if too early in game
@@ -115,10 +118,10 @@ while(1) {
               push @opt_move_mate_in,     'NA';
               next;
               }
-             
+
     	my $playedmove = choosemove(fen => $current_fen, searchmoves => [$move_as_coordinates], depth => $cfg{Depth}, verbose => $cfg{verbose});
     	my $bestmove   = choosemove(fen => $current_fen, depth => $cfg{Depth}, verbose => $cfg{verbose});
-    
+
 		# dummy pos
 		my $dummy_position = Chess::Rep->new($current_fen);
         my $hypothet_move  = $dummy_position->go_move($bestmove->{move});
