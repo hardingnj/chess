@@ -35,8 +35,7 @@ my %hash = ( "1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
 my $dbh = DBI->connect(
   "dbi:$driver:dbname=$database",
   "",
-  "",
-  { sqlite_use_immediate_transaction => 1, }
+  ""
 ) or die $DBI::errstr;
 $dbh->sqlite_busy_timeout($timeout);
 my $sql_selectgame = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND algebraic_moves = ?";
@@ -45,6 +44,21 @@ my $sql_selectfile = "select fid,completed from files WHERE checksum = ?";
 
 # ie infinite loop. This is run as daemon
 while(1) {
+
+  # Look for YAML files
+  my @yaml_files = File::Find::Rule->file()->name("*.YAML")->nonempty()->in('/data/');
+  while(@yaml_files){
+    my $file_yaml = pop @yaml_files;
+    my $yaml = LoadFile($file_yaml);
+    $dbh->do(
+      "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
+      undef,
+      1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}) or die $DBI::errstr;
+
+    print "Entered YAML file $file_yaml in database. Game ID: $yaml->{id}.\n";
+    unlink $file_yaml;
+    }
+
   # this function returns the pgn file, and its fid.
   my $pgnfile = choosePGN($cfg{pgndir}); # This function calls the database
 

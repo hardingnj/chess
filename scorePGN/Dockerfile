@@ -31,6 +31,7 @@ RUN cpanm FileHandle
 RUN cpanm IPC::Open2
 RUN cpanm Term::ANSIColor
 RUN cpanm DBD::SQLite
+RUN cpanm Shell::Command
 
 # install sql
 RUN apt-get install -y sqlite3

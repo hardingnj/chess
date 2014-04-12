@@ -1,0 +1,28 @@
+Following Games had some parsing issues:
+1: lack of move information... need to say that piece becomes queen. http://www.chessgames.com/perl/chessgame?gid=1182320
+7
+25
+36
+46
+80
+98
+139
+141
+225
+242
+243
+253
+
+It is failing on best move... or choose move?
+Solution.. set processed of id 1 to 0, then watch verbose.
+
+To do:
+Add logging: better verbose specifications.
+
+Eval block in score
+
+Add debug option, exits afer one game, evaluates game in CL arg even if processed.
+
+Add interrupt to parsePGN, so can be stopped safely.
+
+Better specification of data dir

@@ -5,12 +5,14 @@ use strict;
 use FileHandle;
 use IPC::Open2;
 use Term::ANSIColor;
-use YAML qw/LoadFile Dump/;
+use YAML qw/LoadFile DumpFile/;
 use Chess::Rep;
 use DBI;
 use Getopt::Long;
+use Shell::Command;
+use DBD::SQLite;
 
-my $VERSION = "0.1.1";
+my $VERSION = "1.0.0";
 
 my %cfg = %{LoadFile("/opt/settings.yaml")};
 
@@ -30,7 +32,7 @@ GetOptions(
   'timeout:i',
   'sleeptime:i',
   'verbose'
-  ) or die "Bad options passed";	
+  ) or die "Bad options passed";
 
 my $database = $cfg{dbpath};
 my $driver   = $cfg{driver} // 'SQLite'; 
@@ -49,37 +51,35 @@ startengine(hashsize => $cfg{hashsize});
 # this is will be a reference to an object. of type game. loop is conditional on this being defined
 # when no more games this is no longer defined and loop exits.
 my $game;
-my $dbh;
+my $outfile;
 
 # Define and declare database connection
-$dbh = DBI->connect(
-	"dbi:$driver:dbname=$database",
-	"",
-	"",
-    { sqlite_use_immediate_transaction => 1, }
-	) or die $DBI::errstr;
-$dbh->sqlite_busy_timeout($timeout);
+my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
+  sqlite_open_flags => DBD::SQLite::OPEN_READONLY,
+  }) or die $DBI::errstr;
+$dbh->sqlite_busy_timeout($timeout) or die $DBI::errstr;
+
 my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
+my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
 
 while(1) {
-  my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
-  $selectgames->execute or die "SQL Error: $DBI::errstr\n";
-    
-  # choose game
-  $game = $selectgames->fetchrow_hashref;
-  $selectgames->finish;
-  if (!defined $game) { warn "No games found to be processed..."; sleep $cfg{sleeptime}; next; }
-    
+
+  eval {
+    $selectgames->execute or die $DBI::errstr;
+    # choose game
+    do {
+      $game = $selectgames->fetchrow_hashref or die $DBI::errstr;
+      die "No games found to be processed...." unless defined $game;
+      $outfile = "/data/$game->{id}.YAML";
+    } while(-e $outfile);
+
+    $selectgames->finish;
+  }; (warn $@ and sleep $cfg{sleeptime} and next) if $@;
+
   my $start = time;
 
   say "About to process game $game->{id}";
-  # set processed to 2. Signifies in process. 
-  $dbh->do(
-    'UPDATE games SET processed = ? WHERE id = ?',
-    undef,
-    2,
-    $game->{id}
-    ) or die $DBI::errstr;
+  touch $outfile;
 
   say "Evaluating game $game->{id}";
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
@@ -104,7 +104,7 @@ while(1) {
 
     	# update board with current move & capture move info
     	my $status = $pos->go_move($move);
-    	my $move_as_coordinates = $status->{from}.$status->{to}; 
+    	my $move_as_coordinates = $status->{from}.$status->{to}.($status->{promote}//''); 
 
         push @coordinate_moves, $move_as_coordinates;
 
@@ -133,21 +133,30 @@ while(1) {
         push @move_scores,          $playedmove->{cp};
         push @move_mate_in,         $playedmove->{matein}; 
         push @opt_move_mate_in,     $bestmove->{matein}; 
-    	}
-    
+        }
+
     my $end = time;
-    
+
     die "something went wrong..." if !@move_scores;
 
-    say "Evaluated game $game->{id}. About to add to databse.";
-    $dbh->do(
-      "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
-      undef,
-      1, join(',', @coordinate_moves), join(',', @move_scores), join(',', @opt_algebraic_moves), join(',', @opt_coordinate_moves), join(',', @opt_move_scores), join(',', @move_mate_in), join(',', @opt_move_mate_in), $end - $start, $game->{id}
-      ) or die $DBI::errstr;
-    
+    say "Evaluated game $game->{id}. About to dump YAML file.";
+    DumpFile(
+      $outfile,
+      {
+        processed            => 1,
+        coordinate_moves     => join(',', @coordinate_moves),
+        move_scores          => join(',', @move_scores),
+        opt_algebraic_moves  => join(',', @opt_algebraic_moves),
+        opt_coordinate_moves => join(',', @opt_coordinate_moves),
+        opt_move_scores      => join(',', @opt_move_scores),
+        move_mate_in         => join(',', @move_mate_in),
+        opt_move_mate_in     => join(',', @opt_move_mate_in),
+        time_s               => $end - $start,
+        id                   => $game->{id}
+      }
+    );
     # end of loop.
-    } 
+}
 die 'Exiting. Should not reach here until killed.';
 
 #-----------------------------------------------	
@@ -169,8 +178,8 @@ sub startengine {
 		if ($count == 0) {
 			print $Engine "uci\n";
 			$count++;
-		}	
-			
+		}
+
 		if ($line eq "uciok") {
 			print $Engine "isready\n";
 			print "Engine is ready\n";
@@ -223,7 +232,10 @@ sub choosemove {
 			print color 'reset' if $args{verbose};
 			$multipv = $line;
 			}
- 		if ($line =~ m/bestmove /) {
+		if ($line =~ m/bestmove /) {
+			print color 'red' if $args{verbose};
+			print "$line\n" if $args{verbose};
+			print color 'reset' if $args{verbose};
 			my @bmarray = split(/ /,$line);
 			$bestmove = $bmarray[1];
 			if (length($bestmove) > 4) {
