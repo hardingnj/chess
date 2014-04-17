@@ -224,7 +224,7 @@ sub choosePGN {
       return { filepath => $chosen_file, id => $gameFromDB->{fid} };
     }
     else {
-      $logger->(warn "I have previously successfully parsed $chosen_file before w/checksum $md5.");
+      $logger->warn("I have previously successfully parsed $chosen_file before w/checksum $md5.");
     }
   }
   # if we have looked at all files, but nothing is new then return undef.
