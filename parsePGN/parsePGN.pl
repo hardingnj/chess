@@ -12,6 +12,22 @@ use Digest::MD5 qw/md5_hex/;
 use IO::File;
 use Getopt::Long;
 use File::Find::Rule;
+use Log::Log4perl qw(get_logger :levels);
+
+my $logger = get_logger("chess::parsepgn");
+$logger->level($INFO);
+
+# Appender
+my $appender = Log::Log4perl::Appender->new(
+    "Log::Dispatch::File",
+    filename => "/data/"."parsepgn_".$ENV{HOSTNAME}.".log",
+    mode     => "append",
+    );
+$logger->add_appender($appender);
+
+# Layouts
+my $layout = Log::Log4perl::Layout::PatternLayout->new("%d %p > %F{1}:%L %M - %m%n");
+$appender->layout($layout);
 
 my %cfg = %{LoadFile("/opt/settings.yaml")};
 
@@ -24,19 +40,20 @@ GetOptions(
   'sleeptime:i',
   'timeout:i',
   'pgndir:s'
-  ) or die "Bad options passed";	
+  ) or $logger->logdie("Bad options passed");	
 
 my $database = $cfg{dbpath};
 my $driver   = $cfg{driver} // 'SQLite'; 
 my $timeout  = $cfg{timeout} // 3000;
+my $last_backup_time = time;
 
-my %hash = ( "1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
+my %hash = ("1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
 
 my $dbh = DBI->connect(
   "dbi:$driver:dbname=$database",
   "",
   ""
-) or die $DBI::errstr;
+) or $logger->logdie($DBI::errstr);
 $dbh->sqlite_busy_timeout($timeout);
 my $sql_selectgame = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND algebraic_moves = ?";
 my $sql_selectplayer = "select given_name, surname, pid from players WHERE surname = ?";
@@ -53,10 +70,16 @@ while(1) {
     $dbh->do(
       "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
       undef,
-      1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}) or die $DBI::errstr;
+      1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}) or $logger->logdie($DBI::errstr);
 
-    print "Entered YAML file $file_yaml in database. Game ID: $yaml->{id}.\n";
+    $logger->info("Entered YAML file $file_yaml in database. Game ID: $yaml->{id}.");
     unlink $file_yaml;
+    }
+
+  # now determine if we should back up.
+  if(time - $last_backup_time > $cfg{backupfreq}*3600) {
+    $dbh->sqlite_backup_to_file($database.'.bak');
+    $last_backup_time = time;
     }
 
   # this function returns the pgn file, and its fid.
@@ -64,7 +87,7 @@ while(1) {
 
   unless (defined $pgnfile) { sleep($cfg{sleeptime}) and next; }
 
-  my $pgn = new Chess::PGN::Parse $pgnfile->{filepath} or die "can't open $pgnfile->{filepath}\n";
+  my $pgn = new Chess::PGN::Parse $pgnfile->{filepath} or $logger->logdie("can't open $pgnfile->{filepath}");
 
   # Parse PGN
   while($pgn->read_game) {
@@ -78,11 +101,11 @@ while(1) {
     my $month = $date[1];
     my $day   = $date[2];
 
-    my $white = return_player_id($pgn->white);
-    my $black = return_player_id($pgn->black);
+    my $white = return_player_id($pgn->white) // next;
+    my $black = return_player_id($pgn->black) // next;
 
-    if (grep { !defined $_ } ($white, $black, $result, $year)) { 
-      warn "Record not successfully parsed, skipping. Should dump a decent log message here.";
+    unless(defined $result && defined $year) { 
+      $logger->warn("Record not successfully parsed, skipping. White: $white, Black: $black, Result: $result, Year: $year.");
       next;
     }
 
@@ -91,8 +114,8 @@ while(1) {
     $day   = undef if $day   =~ m/\?\?/;
 
     # look for duplicates
-    my $selectgame = $dbh->prepare($sql_selectgame) or die $DBI::errstr;
-    $selectgame->execute($white, $black, $year, $result, $moves) or die "SQL Error: $DBI::errstr\n";
+    my $selectgame = $dbh->prepare($sql_selectgame) or $logger->logdie($DBI::errstr);
+    $selectgame->execute($white, $black, $year, $result, $moves) or $logger->logdie("SQL Error: $DBI::errstr");
     my $gameToParse = $selectgame->fetchrow_hashref;
     $selectgame->finish;
 
@@ -101,11 +124,11 @@ while(1) {
         'INSERT INTO games (white, black, event, site, result, year, month, day, round, algebraic_moves, fileid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         undef,
         $white, $black, $pgn->event, $pgn->site, $result, $year, $month, $day, $pgn->round, $moves, $pgnfile->{id}
-        ) or die $DBI::errstr;
+        ) or $logger->logdie($DBI::errstr);
       }
     else { 
       # also should update if any of the fields are null in the original.
-      print "appears to be duplicate of record $gameToParse->{id}. Skipping...".$/; 
+      $logger->info("Appears to be duplicate of record $gameToParse->{id}. Skipping...");
       }
   }
   # if gets here pgn was parsed ok... 
@@ -113,9 +136,7 @@ while(1) {
     'UPDATE files SET completed = ? WHERE fid = ?',
     undef,
     1, $pgnfile->{id}
-    ) or die $DBI::errstr;
-
-  # now sleep to give processor a break and ensure parsing doesn't get too far ahead.
+    ) or $logger->logdie($DBI::errstr);
   sleep($cfg{sleeptime});
 }
 exit 127;
@@ -123,7 +144,8 @@ exit 127;
 sub return_player_id {
   # is white/black a new player?
   # select based on surname, 
-  my $name = shift;
+  my $name   = shift;
+  my $logger = get_logger("chess::parsepgn");
 
   # if computer program, concatenate.
   # has a number. Fritz, Deep blue, junior etc. For now doesn't matter as long as we can recreate initial name.
@@ -135,7 +157,7 @@ sub return_player_id {
     }
   # if contains 'bad characters', i.e. not letters numbers, hyphen, apostrophes or periods.
   elsif($name =~ m/[^a-zA-Z0-9,\.'\-\s]+/) { 
-    warn "$name failed to validate as it contains an unexpected character(s): Skipping.";
+    $logger->warn("Failed to validate ($name) as it contains an unexpected character(s): Skipping...");
     return undef;
     }
 
@@ -144,8 +166,8 @@ sub return_player_id {
   @playername{qw/given_name initials surname suffix/} = parseName2($clean);
 
   # define and initialize database
-  my $selectplayer = $dbh->prepare($sql_selectplayer) or die $DBI::errstr;
-  $selectplayer->execute($playername{surname}) or die "SQL Error: $DBI::errstr\n";
+  my $selectplayer = $dbh->prepare($sql_selectplayer) or $logger->logdie($DBI::errstr);
+  $selectplayer->execute($playername{surname}) or $logger->logdie("SQL Error: $DBI::errstr");
   
   # loop through records, is given name identical? If yes then return id. 
   # row is a array of length=3 with given name/surname/pid
@@ -163,26 +185,28 @@ sub return_player_id {
     'INSERT INTO players (given_name, surname) VALUES (?, ?)',
     undef,
     $playername{given_name}, $playername{surname}
-    ) or die $DBI::errstr;
+    ) or $logger->logdie($DBI::errstr);
   my $id = $dbh->last_insert_id("", "", "players", "");
-  print "adding new player record: $playername{surname}, id: $id".$/;
+  $logger->info("Adding new player record: $playername{surname}, id: $id");
   return $id;
   }
 
 sub choosePGN {
   my $searchdir = shift;
+  my $logger = get_logger("chess::parsepgn");
 
   my @PGNfiles = File::Find::Rule->file()->name('*.PGN', '*.pgn')->in($searchdir);
-  print "In choose PGN. Found @PGNfiles in $searchdir".$/;
+
+  $logger->info("In choose PGN. Found @PGNfiles in $searchdir.");
   
   while(@PGNfiles){ 
     my $chosen_file = splice @PGNfiles, int(rand($#PGNfiles + 1)), 1;
     my $md5 = md5_hex(do { local $/; IO::File->new($chosen_file)->getline });
-    print "selected: $chosen_file".$/;
+    $logger->info("selected: $chosen_file");
 
     # see if this file is in database
-    my $selectfile = $dbh->prepare($sql_selectfile) or die $DBI::errstr;
-    $selectfile->execute($md5) or die "SQL Error: $DBI::errstr\n";
+    my $selectfile = $dbh->prepare($sql_selectfile) or $logger->logdie($DBI::errstr);
+    $selectfile->execute($md5) or $logger->logdie("SQL Error: $DBI::errstr");
     my $gameFromDB = $selectfile->fetchrow_hashref;
     $selectfile->finish;
 
@@ -192,18 +216,18 @@ sub choosePGN {
         'INSERT INTO files (checksum, filename) VALUES (?, ?)',
         undef,
         $md5, $chosen_file
-      ) or die $DBI::errstr;
+      ) or $logger->logdie($DBI::errstr);
     return { filepath => $chosen_file, id => $dbh->last_insert_id("", "", "files", "") };
     }
     elsif(!$gameFromDB->{completed}){
-      warn "Restarting parsing of $chosen_file, as did not complete previously.";
+      $logger->warn("Restarting parsing of $chosen_file, as did not complete previously.");
       return { filepath => $chosen_file, id => $gameFromDB->{fid} };
     }
     else {
-      warn "I have previously successfully parsed $chosen_file before w/checksum $md5.";
+      $logger->(warn "I have previously successfully parsed $chosen_file before w/checksum $md5.");
     }
   }
   # if we have looked at all files, but nothing is new then return undef.
-  warn "No unprocessed files found to parse.";
+  $logger->warn("No unprocessed files found to parse.");
   return undef;
 }

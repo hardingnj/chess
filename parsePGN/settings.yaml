@@ -2,4 +2,5 @@
 dbpath: /data/chessAnalysis.db
 driver: SQLite
 sleeptime: 300
+backupfreq: 6
 pgndir: /pgn/

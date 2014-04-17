@@ -23,6 +23,8 @@ RUN cpanm YAML::Any
 RUN cpanm Chess::PGN::Parse
 RUN cpanm File::Find::Rule
 RUN cpanm DBD::SQLite
+RUN cpanm Log::Log4perl
+RUN cpanm Log::Dispatch::File
 
 # install sql
 RUN apt-get install -y sqlite3
