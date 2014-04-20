@@ -66,19 +66,22 @@ while(1) {
   my @yaml_files = File::Find::Rule->file()->name("*.YAML")->nonempty()->in('/data/');
   while(@yaml_files){
     my $file_yaml = pop @yaml_files;
-    my $yaml = LoadFile($file_yaml);
-    $dbh->do(
-      "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
-      undef,
-      1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}) or $logger->logdie($DBI::errstr);
+    eval {
+      my $yaml = LoadFile($file_yaml);
+      $dbh->do(
+        "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
+        undef,
+        1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}) or $logger->logdie($DBI::errstr);
 
-    $logger->info("Entered YAML file $file_yaml in database. Game ID: $yaml->{id}.");
+      $logger->info("Successfully entered YAML file $file_yaml in database. Game ID: $yaml->{id}.");
+    }; $logger->logwarn($@) if $@;
     unlink $file_yaml;
-    }
+  }
 
   # now determine if we should back up.
   if(time - $last_backup_time > $cfg{backupfreq}*3600) {
-    $dbh->sqlite_backup_to_file($database.'.bak');
+    $logger->info("Backing up sqlite db", int((time - $last_backup_time)/60), "minutes since last backup.");
+    $dbh->sqlite_backup_to_file($database.'.bak') or $logger->logwarn($DBI::errstr);
     $last_backup_time = time;
     }
 
