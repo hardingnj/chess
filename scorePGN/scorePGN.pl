@@ -57,7 +57,6 @@ my $outfile;
 my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
   sqlite_open_flags => DBD::SQLite::OPEN_READONLY,
   }) or die $DBI::errstr;
-$dbh->sqlite_busy_timeout($timeout) or die $DBI::errstr;
 
 my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
 my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
