@@ -58,27 +58,23 @@ my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
   sqlite_open_flags => DBD::SQLite::OPEN_READONLY,
   }) or die $DBI::errstr;
 
-my $sql_selectgames = "select id, algebraic_moves from games WHERE processed = 0";
-my $selectgames = $dbh->prepare($sql_selectgames) or die $DBI::errstr;
-
 while(1) {
 
   eval {
-    $selectgames->execute or die $DBI::errstr;
-    # choose game
-    do {
-      $game = $selectgames->fetchrow_hashref or die $DBI::errstr;
-      die "No games found to be processed...." unless defined $game;
-      $outfile = "/data/$game->{id}.YAML";
-    } while(-e $outfile);
-
-    $selectgames->finish;
+    my $games = $dbh->selectall_arrayref(
+      "SELECT id, algebraic_moves FROM games WHERE processed = 0",
+      { Slice => {}, MaxRows => 16 }
+    );
+    # find $pot_game->{id} YAML that doesn't exist
+    foreach my $pot_game ( @{$games} ) {
+      $outfile = "/data/$pot_game->{id}.YAML";
+      unless(-e $outfile) { $game = $pot_game; touch $outfile; last; }
+    }
+    die "No games found to be processed...." unless defined $game;
   }; (warn $@ and sleep $cfg{sleeptime} and next) if $@;
 
   my $start = time;
-
   say "About to process game $game->{id}";
-  touch $outfile;
 
   say "Evaluating game $game->{id}";
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
