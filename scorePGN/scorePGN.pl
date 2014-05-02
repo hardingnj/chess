@@ -50,8 +50,6 @@ startengine(hashsize => $cfg{hashsize});
 
 # this is will be a reference to an object. of type game. loop is conditional on this being defined
 # when no more games this is no longer defined and loop exits.
-my $game;
-my $outfile;
 
 # Define and declare database connection
 my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
@@ -59,6 +57,8 @@ my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
   }) or die $DBI::errstr;
 
 while(1) {
+  my $game    = undef;
+  my $outfile = undef;
 
   eval {
     my $games = $dbh->selectall_arrayref(
