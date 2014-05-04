@@ -54,7 +54,7 @@ my $dbh = DBI->connect(
   "",
   ""
 ) or $logger->logdie($DBI::errstr);
-$dbh->sqlite_busy_timeout($timeout);
+
 my $sql_selectgame = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND algebraic_moves = ?";
 my $sql_selectplayer = "select given_name, surname, pid from players WHERE surname = ?";
 my $sql_selectfile = "select fid,completed from files WHERE checksum = ?";
@@ -69,9 +69,9 @@ while(1) {
     eval {
       my $yaml = LoadFile($file_yaml);
       $dbh->do(
-        "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
+        "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ? and processed = ?",
         undef,
-        1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}) or $logger->logdie($DBI::errstr);
+        1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}, 0) or $logger->logdie($DBI::errstr);
 
       $logger->info("Successfully entered YAML file $file_yaml in database. Game ID: $yaml->{id}.");
     }; $logger->logwarn($@) if $@;

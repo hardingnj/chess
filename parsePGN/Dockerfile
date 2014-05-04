@@ -2,7 +2,7 @@
 # VERSION       1
 
 # use the ubuntu base image provided by dotCloud
-FROM ubuntu
+FROM ubuntu:12.04
 
 MAINTAINER Nicholas Harding nickharding@fastmail.net
 
@@ -11,6 +11,7 @@ RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt
 RUN apt-get update
 
 # install perl and modules
+RUN apt-get clean
 RUN apt-get install -y build-essential
 RUN apt-get install -y make
 RUN apt-get install -y perl
