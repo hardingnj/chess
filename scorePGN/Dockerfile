@@ -2,19 +2,23 @@
 # VERSION       1
 
 # use the ubuntu base image provided by dotCloud
-FROM ubuntu
+FROM ubuntu:12.04
 
 MAINTAINER Nicholas Harding nickharding@fastmail.net
 
 # make sure the package repository is up to date
-RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list
+#RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list
 RUN apt-get update
 
 # install stockfish
+RUN apt-get clean
+RUN apt-get install -y aptitude
+RUN apt-get install -y gcc
+RUN apt-get install -y g++
+RUN apt-get install -y build-essential
 RUN apt-get install -y curl
 RUN apt-get install -y unzip
 RUN apt-get install -y make
-RUN apt-get install -y build-essential g++
 RUN curl https://s3.amazonaws.com/stockfish/stockfish-dd-src.zip -o /home/stockfish.zip
 RUN unzip /home/stockfish.zip -d /home/
 RUN cd /home/stockfish-dd-src/src/ && make build ARCH=x86-32
