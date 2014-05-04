@@ -62,19 +62,27 @@ while(1) {
 
   eval {
     my $games = $dbh->selectall_arrayref(
-      "SELECT id, algebraic_moves FROM games WHERE processed = 0",
-      { Slice => {}, MaxRows => 16 }
+      "SELECT id, algebraic_moves FROM games WHERE processed = ?",
+      { Slice => {}, MaxRows => 16 },
+      1
     );
     # find $pot_game->{id} YAML that doesn't exist
     foreach my $pot_game ( @{$games} ) {
       $outfile = "/data/$pot_game->{id}.YAML";
-      unless(-e $outfile) { $game = $pot_game; touch $outfile; last; }
+      if(!-e $outfile) { 
+        $game = $pot_game; 
+        touch $outfile;
+        last;
+      }
+      else { say "$outfile exists, moving to next game in db."; }
     }
     die "No games found to be processed...." unless defined $game;
   }; (warn $@ and sleep $cfg{sleeptime} and next) if $@;
 
   my $start = time;
   say "About to process game $game->{id}";
+  die "This game has already been evaluated. Move scores is defined. $!" if defined $game->{move_scores};
+  die "This game has already been evaluated. Processed = 1. $!" if $game->{processed};
 
   say "Evaluating game $game->{id}";
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
