@@ -7,7 +7,7 @@ FROM ubuntu:12.04
 MAINTAINER Nicholas Harding nickharding@fastmail.net
 
 # make sure the package repository is up to date
-RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list
+#RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list
 RUN apt-get update
 
 # install perl and modules
