@@ -52,8 +52,10 @@ my %hash = ("1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
 my $dbh = DBI->connect(
   "dbi:$driver:dbname=$database",
   "",
-  ""
+  "",
+  { AutoCommit => 0 }
 ) or $logger->logdie($DBI::errstr);
+
 
 my $sql_selectgame = "select id from games WHERE white = ? AND black = ? AND year = ? AND result = ? AND algebraic_moves = ?";
 my $sql_selectplayer = "select given_name, surname, pid from players WHERE surname = ?";
@@ -67,14 +69,26 @@ while(1) {
   while(@yaml_files){
     my $file_yaml = pop @yaml_files;
     eval {
-      my $yaml = LoadFile($file_yaml);
-      $dbh->do(
-        "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?, opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ? and processed = ?",
-        undef,
-        1, $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, $yaml->{id}, 0) or $logger->logdie($DBI::errstr);
 
+      my $yaml = LoadFile($file_yaml);
+
+      $dbh->do(
+        "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?,
+         opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ? and processed = ?",
+        undef,
+        1, 
+        $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, 
+        $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, 
+        $yaml->{id}, 0
+      ) or $logger->logdie($DBI::errstr);
+
+      $dbh->commit();
       $logger->info("Successfully entered YAML file $file_yaml in database. Game ID: $yaml->{id}.");
-    }; $logger->logwarn($@) if $@;
+    }; 
+    if($@){
+      $logger->logwarn($@) ;
+      $dbh->rollback();
+    }
     unlink $file_yaml;
   }
 
@@ -123,23 +137,37 @@ while(1) {
     $selectgame->finish;
 
     unless (defined $gameToParse) {
-      $dbh->do(
-        'INSERT INTO games (white, black, event, site, result, year, month, day, round, algebraic_moves, fileid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        undef,
-        $white, $black, $pgn->event, $pgn->site, $result, $year, $month, $day, $pgn->round, $moves, $pgnfile->{id}
-        ) or $logger->logdie($DBI::errstr);
+      eval { 
+        $dbh->do(
+          'INSERT INTO games (white, black, event, site, result, year, month, day, round, algebraic_moves, fileid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          undef,
+          $white, $black, $pgn->event, $pgn->site, $result, $year, $month, $day, $pgn->round, $moves, $pgnfile->{id}
+          ) or $logger->logdie($DBI::errstr);
+        $dbh->commit;
+      };
+      if($@) {
+        $dbh->rollback();
+        $logger->logwarn($@);
       }
+    }
     else { 
       # also should update if any of the fields are null in the original.
       $logger->info("Appears to be duplicate of record $gameToParse->{id}. Skipping...");
       }
   }
   # if gets here pgn was parsed ok... 
-  $dbh->do(
-    'UPDATE files SET completed = ? WHERE fid = ?',
-    undef,
-    1, $pgnfile->{id}
+  eval {
+    $dbh->do(
+      'UPDATE files SET completed = ? WHERE fid = ?',
+      undef,
+      1, $pgnfile->{id}
     ) or $logger->logdie($DBI::errstr);
+    $dbh->commit;
+  };
+  if($@) {
+    $dbh->rollback();
+    $logger->logwarn($@);
+  }
   sleep($cfg{sleeptime});
 }
 exit 127;
@@ -171,7 +199,7 @@ sub return_player_id {
   # define and initialize database
   my $selectplayer = $dbh->prepare($sql_selectplayer) or $logger->logdie($DBI::errstr);
   $selectplayer->execute($playername{surname}) or $logger->logdie("SQL Error: $DBI::errstr");
-  
+
   # loop through records, is given name identical? If yes then return id. 
   # row is a array of length=3 with given name/surname/pid
   my %record;
@@ -184,15 +212,24 @@ sub return_player_id {
   }
   # else add new record, return id.
   $selectplayer->finish;
-  my $pid = $dbh->do(
-    'INSERT INTO players (given_name, surname) VALUES (?, ?)',
-    undef,
-    $playername{given_name}, $playername{surname}
-    ) or $logger->logdie($DBI::errstr);
-  my $id = $dbh->last_insert_id("", "", "players", "");
-  $logger->info("Adding new player record: $playername{surname}, id: $id");
-  return $id;
+  my $id;
+  eval {
+    $dbh->do(
+      'INSERT INTO players (given_name, surname) VALUES (?, ?)',
+      undef,
+      $playername{given_name}, $playername{surname}
+      ) or $logger->logdie($DBI::errstr);
+    $dbh->commit;
+    $id = $dbh->last_insert_id("", "", "players", "");
+    $logger->info("Adding new player record: $playername{surname}, id: $id");
+  };
+  if($@) {
+    $dbh->rollback();
+    $logger->logwarn($@);
+    return undef;
   }
+  return $id;
+}
 
 sub choosePGN {
   my $searchdir = shift;
@@ -201,7 +238,7 @@ sub choosePGN {
   my @PGNfiles = File::Find::Rule->file()->name('*.PGN', '*.pgn')->in($searchdir);
 
   $logger->info("In choose PGN. Found @PGNfiles in $searchdir.");
-  
+
   while(@PGNfiles){ 
     my $chosen_file = splice @PGNfiles, int(rand($#PGNfiles + 1)), 1;
     my $md5 = md5_hex(do { local $/; IO::File->new($chosen_file)->getline });
@@ -215,12 +252,19 @@ sub choosePGN {
 
     if(!defined $gameFromDB) {
       # ie not seen before
-      $dbh->do(
-        'INSERT INTO files (checksum, filename) VALUES (?, ?)',
-        undef,
-        $md5, $chosen_file
-      ) or $logger->logdie($DBI::errstr);
-    return { filepath => $chosen_file, id => $dbh->last_insert_id("", "", "files", "") };
+      eval {
+        $dbh->do(
+          'INSERT INTO files (checksum, filename) VALUES (?, ?)',
+          undef,
+          $md5, $chosen_file
+        ) or $logger->logdie($DBI::errstr);
+        $dbh->commit;
+      };
+      if($@) {
+        $dbh->rollback();
+        $logger->logwarn($@);
+      }
+      return { filepath => $chosen_file, id => $dbh->last_insert_id("", "", "files", "") };
     }
     elsif(!$gameFromDB->{completed}){
       $logger->warn("Restarting parsing of $chosen_file, as did not complete previously.");

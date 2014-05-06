@@ -48,18 +48,18 @@ my ($Reader, $Engine);
 my $pid = open2($Reader,$Engine,$engine);
 startengine(hashsize => $cfg{hashsize});
 
+my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
+  sqlite_open_flags => DBD::SQLite::OPEN_READONLY,
+  }) or die $DBI::errstr;
+
 while(1) {
   my $game    = undef;
   my $outfile = undef;
+  # Define and declare database connection
 
   eval {
-    # Define and declare database connection
-    my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
-      sqlite_open_flags => DBD::SQLite::OPEN_READONLY,
-      }) or die $DBI::errstr;
-
     my $games = $dbh->selectall_arrayref(
-      "SELECT id, algebraic_moves, result FROM games WHERE processed = 1",
+      "SELECT id, algebraic_moves, result, processed FROM games WHERE processed=0",
       { Slice => {}, MaxRows => 16 }
     );
     # find $pot_game->{id} YAML that doesn't exist
@@ -72,13 +72,12 @@ while(1) {
       }
       else { say "$outfile exists, moving to next game in db."; }
     }
-    $dbh->disconnect();
     die "No games found to be processed...." unless defined $game;
   }; (warn $@ and sleep $cfg{sleeptime} and next) if $@;
 
   my $start = time;
   say "About to process game $game->{id}";
-  die "This game has already been evaluated. Move scores is defined. $!" if defined $game->{result};
+  die "This game has already been evaluated. Result is defined." and Dump($game) if defined $game->{result};
 
   say "Evaluating game $game->{id}";
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
