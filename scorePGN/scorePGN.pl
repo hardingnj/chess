@@ -5,7 +5,7 @@ use strict;
 use FileHandle;
 use IPC::Open2;
 use Term::ANSIColor;
-use YAML qw/LoadFile DumpFile/;
+use YAML qw/LoadFile DumpFile Dump/;
 use Chess::Rep;
 use DBI;
 use Getopt::Long;
@@ -41,6 +41,7 @@ my $timeout  = $cfg{timeout} // 3000;
 my $engine  = $cfg{Engine};
 my $perlversion = sprintf "%vd", $^V;
 my $osstring = $^O;
+my %analyzed_games;
 
 # instantiate engine.
 print "set interface $engine (Perl: $perlversion, OS: $osstring, VERSION: $VERSION)\n";
@@ -48,20 +49,24 @@ my ($Reader, $Engine);
 my $pid = open2($Reader,$Engine,$engine);
 startengine(hashsize => $cfg{hashsize});
 
-my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef, {
-  sqlite_open_flags => DBD::SQLite::OPEN_READONLY,
-  }) or die $DBI::errstr;
+my $dbh = DBI->connect("dbi:SQLite:$database", undef, undef) or die $DBI::errstr;
 
 while(1) {
   my $game    = undef;
   my $outfile = undef;
+  my $games   = undef;
   # Define and declare database connection
 
   eval {
-    my $games = $dbh->selectall_arrayref(
-      "SELECT id, algebraic_moves, result, processed FROM games WHERE processed=0",
+    $games = $dbh->selectall_arrayref(
+      "SELECT id, algebraic_moves, opt_move_scores, processed FROM games WHERE processed=0",
       { Slice => {}, MaxRows => 16 }
     );
+
+    say "Read from db ok";
+    my @ids; push @ids, $_->{id} for @{$games};
+    print "IDs: ".join("\t", @ids)."\n";
+
     # find $pot_game->{id} YAML that doesn't exist
     foreach my $pot_game ( @{$games} ) {
       $outfile = "/data/$pot_game->{id}.YAML";
@@ -70,16 +75,24 @@ while(1) {
         touch $outfile;
         last;
       }
-      else { say "$outfile exists, moving to next game in db."; }
     }
     die "No games found to be processed...." unless defined $game;
   }; (warn $@ and sleep $cfg{sleeptime} and next) if $@;
 
   my $start = time;
   say "About to process game $game->{id}";
-  die "This game has already been evaluated. Result is defined." and Dump($game) if defined $game->{result};
+  Dump($game) and die "Something odd, game has already been processed." if $game->{processed};
+  Dump($game) and die "Game has already been processed." if defined $game->{opt_move_scores};
 
-  say "Evaluating game $game->{id}";
+  # Major error checking
+  $analyzed_games{$game->{id}}++;
+  if (1 < $analyzed_games{$game->{id}}) {
+    foreach my $g (@{$games}){
+      print Dump($g);
+      }
+     die "Game has already been evaluated by this container!. $!";
+   }
+
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
   my @coordinate_moves;
   my @move_scores;

@@ -39,13 +39,17 @@ GetOptions(
   'driver:s',
   'sleeptime:i',
   'timeout:i',
-  'pgndir:s'
+  'pgndir:s',
+  'debug'
   ) or $logger->logdie("Bad options passed");	
 
 my $database = $cfg{dbpath};
 my $driver   = $cfg{driver} // 'SQLite'; 
 my $timeout  = $cfg{timeout} // 3000;
 my $last_backup_time = time;
+my $debug_mode = $cfg{debug};
+$cfg{sleeptime} = 10 if $debug_mode;
+$logger->logwarn("In DEBUG mode. No PGNS will be parsed.");
 
 my %hash = ("1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
 
@@ -74,12 +78,12 @@ while(1) {
 
       $dbh->do(
         "UPDATE games SET processed = ?, coordinate_moves = ?, move_scores = ?, opt_algebraic_moves = ?,
-         opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ? and processed = ?",
+         opt_coordinate_moves = ?, opt_move_scores = ?, move_mate_in = ?, opt_move_mate_in = ?, time_s = ? WHERE id = ?",
         undef,
-        1, 
+        1,
         $yaml->{coordinate_moves}, $yaml->{move_scores}, $yaml->{opt_algebraic_moves}, $yaml->{opt_coordinate_moves}, 
         $yaml->{opt_move_scores}, $yaml->{move_mate_in}, $yaml->{opt_move_mate_in}, $yaml->{time_s}, 
-        $yaml->{id}, 0
+        $yaml->{id}
       ) or $logger->logdie($DBI::errstr);
 
       $dbh->commit();
@@ -99,10 +103,13 @@ while(1) {
     $last_backup_time = time;
     }
 
+  # debug mode?
+  if($debug_mode){ sleep($cfg{sleeptime}) and next; }
+
   # this function returns the pgn file, and its fid.
   my $pgnfile = choosePGN($cfg{pgndir}); # This function calls the database
 
-  unless (defined $pgnfile) { sleep($cfg{sleeptime}) and next; }
+  unless(defined $pgnfile){ sleep($cfg{sleeptime}) and next; }
 
   my $pgn = new Chess::PGN::Parse $pgnfile->{filepath} or $logger->logdie("can't open $pgnfile->{filepath}");
 

@@ -12,8 +12,6 @@ RUN apt-get update
 
 # install stockfish
 RUN apt-get clean
-RUN apt-get install -y aptitude
-RUN apt-get install -y gcc
 RUN apt-get install -y g++
 RUN apt-get install -y build-essential
 RUN apt-get install -y curl
