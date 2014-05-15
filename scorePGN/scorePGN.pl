@@ -29,14 +29,12 @@ GetOptions(
   'Depth:i',
   'EvalAfter:i',
   'hashsize:i',
-  'timeout:i',
   'sleeptime:i',
   'verbose'
   ) or die "Bad options passed";
 
 my $database = $cfg{dbpath};
 my $driver   = $cfg{driver} // 'SQLite'; 
-my $timeout  = $cfg{timeout} // 3000;
 
 my $engine  = $cfg{Engine};
 my $perlversion = sprintf "%vd", $^V;
@@ -60,10 +58,10 @@ while(1) {
   eval {
     $games = $dbh->selectall_arrayref(
       "SELECT id, algebraic_moves, opt_move_scores, processed FROM games WHERE processed=0",
-      { Slice => {}, MaxRows => 16 }
+      { Slice => {}, MaxRows => 200 }
     );
 
-    say "Read from db ok";
+    say "Read from db ok" if $cfg{verbose};
     my @ids; push @ids, $_->{id} for @{$games};
     print "IDs: ".join("\t", @ids)."\n";
 

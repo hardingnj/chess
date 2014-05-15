@@ -40,7 +40,7 @@ GetOptions(
   'sleeptime:i',
   'timeout:i',
   'pgndir:s',
-  'debug'
+  'debug!'
   ) or $logger->logdie("Bad options passed");	
 
 my $database = $cfg{dbpath};
@@ -49,7 +49,7 @@ my $timeout  = $cfg{timeout} // 3000;
 my $last_backup_time = time;
 my $debug_mode = $cfg{debug};
 $cfg{sleeptime} = 10 if $debug_mode;
-$logger->logwarn("In DEBUG mode. No PGNS will be parsed.");
+$logger->logwarn("In DEBUG mode. No PGNS will be parsed.") if $debug_mode;
 
 my %hash = ("1-0" => 1, "0-1" => 0, "1/2-1/2" => 2, "0.5-0.5" => 2);
 

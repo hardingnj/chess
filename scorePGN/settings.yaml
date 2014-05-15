@@ -5,5 +5,4 @@ sleeptime: 200
 EvalAfter: 4
 hashsize: 1024
 dbpath: /data/chessAnalysis.db
-timeout: 0
 driver: SQLite
