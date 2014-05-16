@@ -63,7 +63,7 @@ while(1) {
 
     say "Read from db ok" if $cfg{verbose};
     my @ids; push @ids, $_->{id} for @{$games};
-    print "IDs: ".join("\t", @ids)."\n";
+    say "IDs: ".join("\t", @ids) if $cfg{verbose};
 
     # find $pot_game->{id} YAML that doesn't exist
     foreach my $pot_game ( @{$games} ) {
@@ -78,7 +78,7 @@ while(1) {
   }; (warn $@ and sleep $cfg{sleeptime} and next) if $@;
 
   my $start = time;
-  say "About to process game $game->{id}";
+  say "About to process game $game->{id}" if $cfg{verbose};
   Dump($game) and die "Something odd, game has already been processed." if $game->{processed};
   Dump($game) and die "Game has already been processed." if defined $game->{opt_move_scores};
 
