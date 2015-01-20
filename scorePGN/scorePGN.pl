@@ -82,13 +82,13 @@ while(1) {
   Dump($game) and die "Something odd, game has already been processed." if $game->{processed};
   Dump($game) and die "Game has already been processed." if defined $game->{opt_move_scores};
 
-  # Major error checking
+  # Checking: possible lag in parse may be causing issues.
   $analyzed_games{$game->{id}}++;
   if (1 < $analyzed_games{$game->{id}}) {
-    foreach my $g (@{$games}){
-      print Dump($g);
-      }
-     die "Game has already been evaluated by this container!. $!";
+	# fact: game already processed. 
+    # fact: game may have been deleted, but db not updated ie lag.
+    Dump($game) and warn "Game $game->{id} has already been evaluated by this container." 
+		and sleep $cfg{sleeptime} and next;
    }
 
   my @algebraic_moves = split(/,/, $game->{algebraic_moves});
