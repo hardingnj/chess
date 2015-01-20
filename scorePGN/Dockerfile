@@ -17,7 +17,7 @@ RUN apt-get install -y build-essential
 RUN apt-get install -y curl
 RUN apt-get install -y unzip
 RUN apt-get install -y make
-RUN curl https://s3.amazonaws.com/stockfish/stockfish-dd-src.zip -o /home/stockfish.zip
+ADD ./stockfish-dd-src.zip /home/stockfish.zip
 RUN unzip /home/stockfish.zip -d /home/
 RUN cd /home/stockfish-dd-src/src/ && make build ARCH=x86-32
 ENV PATH $PATH:/home/stockfish-dd-src/src/
