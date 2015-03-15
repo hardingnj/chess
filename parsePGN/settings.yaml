@@ -4,3 +4,4 @@ driver: SQLite
 sleeptime: 300
 backupfreq: 6
 pgndir: /pgn/
+n_unprocessed: 10000

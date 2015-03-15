@@ -46,6 +46,7 @@ GetOptions(
 my $database = $cfg{dbpath};
 my $driver   = $cfg{driver} // 'SQLite'; 
 my $timeout  = $cfg{timeout} // 3000;
+my $unprocessed_pile = $cfg{n_unprocessed} // 10000;
 my $last_backup_time = time;
 my $debug_mode = $cfg{debug};
 $cfg{sleeptime} = 10 if $debug_mode;
@@ -107,8 +108,19 @@ while(1) {
   if($debug_mode){ sleep($cfg{sleeptime}) and next; }
 
   # this function returns the pgn file, and its fid.
-  my $pgnfile = choosePGN($cfg{pgndir}); # This function calls the database
+  # check how many games are processed...
+  my $sth = $dbh->prepare("select COUNT(*) from games where processed=0");
+  $sth->execute();
+  my $count = $sth->fetchrow_arrayref();
+  my $value = @$count[0];
+  $sth->finish();
 
+  my $pgnfile;
+  if($value < $unprocessed_pile) {
+    # This function calls the database
+    $logger->info("Few unevaluated games. Processing more.");
+    $pgnfile = choosePGN($cfg{pgndir}); 
+    }
   unless(defined $pgnfile){ sleep($cfg{sleeptime}) and next; }
 
   my $pgn = new Chess::PGN::Parse $pgnfile->{filepath} or $logger->logdie("can't open $pgnfile->{filepath}");
@@ -244,12 +256,9 @@ sub choosePGN {
 
   my @PGNfiles = File::Find::Rule->file()->name('*.PGN', '*.pgn')->in($searchdir);
 
-  $logger->info("In choose PGN. Found @PGNfiles in $searchdir.");
-
   while(@PGNfiles){ 
     my $chosen_file = splice @PGNfiles, int(rand($#PGNfiles + 1)), 1;
     my $md5 = md5_hex(do { local $/; IO::File->new($chosen_file)->getline });
-    $logger->info("selected: $chosen_file");
 
     # see if this file is in database
     my $selectfile = $dbh->prepare($sql_selectfile) or $logger->logdie($DBI::errstr);
@@ -259,6 +268,7 @@ sub choosePGN {
 
     if(!defined $gameFromDB) {
       # ie not seen before
+      $logger->info("Processing: $chosen_file");
       eval {
         $dbh->do(
           'INSERT INTO files (checksum, filename) VALUES (?, ?)',
@@ -276,9 +286,6 @@ sub choosePGN {
     elsif(!$gameFromDB->{completed}){
       $logger->warn("Restarting parsing of $chosen_file, as did not complete previously.");
       return { filepath => $chosen_file, id => $gameFromDB->{fid} };
-    }
-    else {
-      $logger->warn("I have previously successfully parsed $chosen_file before w/checksum $md5.");
     }
   }
   # if we have looked at all files, but nothing is new then return undef.
