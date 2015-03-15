@@ -58,7 +58,7 @@ while(1) {
   eval {
     $games = $dbh->selectall_arrayref(
       "SELECT id, algebraic_moves, opt_move_scores, processed FROM games WHERE processed=0",
-      { Slice => {}, MaxRows => 200 }
+      { Slice => {}, MaxRows => 500 }
     );
 
     say "Read from db ok" if $cfg{verbose};
